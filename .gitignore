@@ -1,3 +1,7 @@
 /ADNIMERGE2
 data/.DS_Store
 .DS_Store
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
