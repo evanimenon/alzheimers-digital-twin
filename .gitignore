@@ -5,3 +5,4 @@ data/.DS_Store
 # Jupyter Notebook Checkpoints
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
+/me
