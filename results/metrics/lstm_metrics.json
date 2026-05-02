@@ -1,6 +1,6 @@
 {
-  "mmse_mae": 3.1713,
-  "mmse_r2": 0.0293,
-  "hippo_mae": 4712.15,
-  "hippo_r2": -19.6601
+    "mmse_mae": 1.7603,
+    "mmse_r2": 0.6885,
+    "hippo_mae": 69.47,
+    "hippo_r2": 0.9898
 }
