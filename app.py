@@ -609,7 +609,7 @@ def _plotly_layout_base(title: str, yaxis_title: str, height: int = 400) -> dict
 def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
     fig = go.Figure()
     if not demo:
-        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
+        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 420))
         fig.add_annotation(text="Add results/metrics/demo_data.json", xref="paper",
                            yref="paper", x=0.5, y=0.5, showarrow=False,
                            font=dict(color="#7a7a73", size=14))
@@ -617,25 +617,75 @@ def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
         return fig
     p = _demo_patient(demo, rid)
     if not p:
-        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
+        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 420))
         fig.add_annotation(text="Patient not found", xref="paper", yref="paper",
                            x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
         fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
+
     v_obs, m_obs = p["visits_obs"], p["mmse_obs"]
-    v_roll = [v_obs[-1]] + p["pred_visits"]
-    m_roll = [m_obs[-1]] + p["mmse_pred"]
-    fig.add_trace(go.Scatter(x=v_obs, y=m_obs, mode="lines+markers", name="Observed (ADNI)",
-                             line=dict(color="#2f4f3f", width=2.8),
-                             marker=dict(size=9, color="#2f4f3f")))
-    fig.add_trace(go.Scatter(x=v_roll, y=m_roll, mode="lines+markers", name="Predicted (LSTM)",
-                             line=dict(color="#8fa396", width=2.2, dash="dash"),
-                             marker=dict(size=8, symbol="square", color="#8fa396")))
-    fig.add_hline(y=24, line_dash="dot", line_color="#c4c4bd", opacity=0.9)
-    fig.add_annotation(xref="paper", yref="y", x=0.01, y=24.6, text="MCI threshold (24)",
-                       showarrow=False, font=dict(size=10, color="#7a7a73"), xanchor="left")
-    fig.update_layout(**_plotly_layout_base(f"MMSE — RID {p['rid']}", "MMSE score"))
-    fig.update_yaxes(range=[0, 32])
+    v_pred       = p["pred_visits"]
+    m_pred       = p["mmse_pred"]
+
+    # ── shade the prediction zone ──────────────────────────────────────
+    if v_pred:
+        x_zone = [v_obs[-1]] + v_pred + v_pred[::-1] + [v_obs[-1]]
+        y_hi   = [m_obs[-1]] + [min(mp + 2.0, 30) for mp in m_pred]
+        y_lo   = [m_obs[-1]] + [max(mp - 2.0, 0)  for mp in m_pred]
+        fig.add_trace(go.Scatter(
+            x=x_zone, y=y_hi + y_lo[::-1],
+            fill="toself", fillcolor="rgba(143,163,150,0.12)",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"))
+
+    # ── MCI danger zone shading (0–24) ─────────────────────────────────
+    all_v = list(v_obs) + list(v_pred)
+    if all_v:
+        fig.add_trace(go.Scatter(
+            x=[min(all_v) - 0.3, max(all_v) + 0.3, max(all_v) + 0.3, min(all_v) - 0.3],
+            y=[0, 0, 24, 24],
+            fill="toself", fillcolor="rgba(239,83,80,0.04)",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"))
+
+    # ── Observed trace ─────────────────────────────────────────────────
+    fig.add_trace(go.Scatter(
+        x=v_obs, y=m_obs, mode="lines+markers", name="Observed (ADNI)",
+        line=dict(color="#2f4f3f", width=3),
+        marker=dict(size=10, color="#2f4f3f", line=dict(width=2, color="#fafaf7")),
+        hovertemplate="Visit %{x}<br>MMSE: <b>%{y:.1f}</b><extra>Observed</extra>"))
+
+    # ── Predicted trace ────────────────────────────────────────────────
+    if v_pred:
+        v_roll = [v_obs[-1]] + list(v_pred)
+        m_roll = [m_obs[-1]] + list(m_pred)
+        fig.add_trace(go.Scatter(
+            x=v_roll, y=m_roll, mode="lines+markers", name="Predicted (LSTM)",
+            line=dict(color="#5b8c6e", width=2.5, dash="dash"),
+            marker=dict(size=9, symbol="diamond", color="#5b8c6e",
+                        line=dict(width=2, color="#fafaf7")),
+            hovertemplate="Visit %{x}<br>MMSE: <b>%{y:.1f}</b><extra>Predicted</extra>"))
+
+    # ── MCI threshold line ─────────────────────────────────────────────
+    fig.add_hline(y=24, line_dash="dot", line_color="#d4a843", line_width=1.5, opacity=0.8)
+    fig.add_annotation(
+        xref="paper", yref="y", x=0.02, y=25.0,
+        text="⚠ MCI threshold (24)",
+        showarrow=False, font=dict(size=10, color="#c4943a", family="DM Sans"), xanchor="left")
+
+    # ── Score band annotations ─────────────────────────────────────────
+    fig.add_annotation(
+        xref="paper", yref="y", x=0.99, y=28.5,
+        text="Normal (≥27)", showarrow=False,
+        font=dict(size=9, color="#8fa396"), xanchor="right")
+    fig.add_annotation(
+        xref="paper", yref="y", x=0.99, y=21,
+        text="MCI zone", showarrow=False,
+        font=dict(size=9, color="#ef5350", family="DM Sans"), xanchor="right")
+
+    layout = _plotly_layout_base(f"MMSE Trajectory — RID {p['rid']}", "MMSE score (0–30)", 420)
+    layout["yaxis"]["range"] = [0, 32]
+    layout["yaxis"]["tickvals"] = [0, 10, 20, 24, 27, 30]
+    layout["xaxis"]["dtick"] = 1
+    fig.update_layout(**layout)
     return fig
 
 
@@ -643,29 +693,96 @@ def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
     import math as _math
     fig = go.Figure()
     if not demo:
-        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
+        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 420))
         fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
     p = _demo_patient(demo, rid)
     if not p:
-        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
+        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 420))
         fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
-    v_obs, h_obs = p["visits_obs"], p["hippo_obs"]
-    fig.add_trace(go.Scatter(x=v_obs, y=h_obs, mode="lines+markers", name="Observed (ADNI)",
-                             line=dict(color="#2f4f3f", width=2.8),
-                             marker=dict(size=9, color="#2f4f3f"), connectgaps=False))
-    hp = p.get("hippo_pred", [])
-    pv = p.get("pred_visits", [])
-    if hp and pv and not all(_math.isnan(h) if isinstance(h, float) else False for h in hp):
+
+    v_obs = p["visits_obs"]
+    h_obs = p["hippo_obs"]
+    hp    = p.get("hippo_pred", [])
+    pv    = p.get("pred_visits", [])
+    has_pred = bool(hp and pv and not all(
+        _math.isnan(h) if isinstance(h, float) else False for h in hp))
+
+    # ── Healthy hippocampus reference band (5500–6500 mm³) ─────────────
+    all_v = list(v_obs) + (list(pv) if has_pred else [])
+    if all_v:
+        xmin, xmax = min(all_v) - 0.3, max(all_v) + 0.3
+        fig.add_trace(go.Scatter(
+            x=[xmin, xmax, xmax, xmin],
+            y=[5500, 5500, 6500, 6500],
+            fill="toself", fillcolor="rgba(79,195,247,0.06)",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig.add_annotation(
+            xref="paper", yref="y", x=0.99, y=6400,
+            text="Healthy range (5500–6500)", showarrow=False,
+            font=dict(size=9, color="#4fc3f7"), xanchor="right")
+
+    # ── Compute % change from baseline for annotation ──────────────────
+    pct_change = None
+    if h_obs and hp:
+        baseline = h_obs[0]
+        final    = hp[-1] if hp else h_obs[-1]
+        if baseline > 0:
+            pct_change = (final - baseline) / baseline * 100
+
+    # ── Prediction uncertainty band ────────────────────────────────────
+    if has_pred:
         v_roll = [v_obs[-1]] + list(pv)
         h_roll = [h_obs[-1]] + list(hp)
-        fig.add_trace(go.Scatter(x=v_roll, y=h_roll, mode="lines+markers",
-                                 name="Predicted (LSTM)",
-                                 line=dict(color="#8fa396", width=2.2, dash="dash"),
-                                 marker=dict(size=8, symbol="square", color="#8fa396"),
-                                 connectgaps=False))
-    fig.update_layout(**_plotly_layout_base(f"Hippocampus — RID {p['rid']}", "Hippocampus volume (mm³)"))
+        band   = [max(h * 0.015, 30) for h in hp]   # ±1.5% uncertainty
+        y_hi   = [h_obs[-1]] + [h + b for h, b in zip(hp, band)]
+        y_lo   = [h_obs[-1]] + [h - b for h, b in zip(hp, band)]
+        fig.add_trace(go.Scatter(
+            x=v_roll + v_roll[::-1], y=y_hi + y_lo[::-1],
+            fill="toself", fillcolor="rgba(143,163,150,0.12)",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"))
+
+    # ── Observed trace ─────────────────────────────────────────────────
+    fig.add_trace(go.Scatter(
+        x=v_obs, y=h_obs, mode="lines+markers", name="Observed (ADNI)",
+        line=dict(color="#2f4f3f", width=3),
+        marker=dict(size=10, color="#2f4f3f", line=dict(width=2, color="#fafaf7")),
+        hovertemplate="Visit %{x}<br>Vol: <b>%{y:,.0f} mm³</b><extra>Observed</extra>",
+        connectgaps=False))
+
+    # ── Predicted trace ────────────────────────────────────────────────
+    if has_pred:
+        fig.add_trace(go.Scatter(
+            x=v_roll, y=h_roll, mode="lines+markers", name="Predicted (atrophy model)",
+            line=dict(color="#5b8c6e", width=2.5, dash="dash"),
+            marker=dict(size=9, symbol="diamond", color="#5b8c6e",
+                        line=dict(width=2, color="#fafaf7")),
+            hovertemplate="Visit %{x}<br>Vol: <b>%{y:,.0f} mm³</b><extra>Predicted</extra>",
+            connectgaps=False))
+
+    # ── % atrophy annotation ───────────────────────────────────────────
+    if pct_change is not None:
+        sign  = "▼" if pct_change < 0 else "▲"
+        color = "#ef5350" if pct_change < -3 else "#8fa396"
+        fig.add_annotation(
+            xref="paper", yref="paper", x=0.98, y=0.06,
+            text=f"{sign} {abs(pct_change):.1f}% projected atrophy",
+            showarrow=False, font=dict(size=11, color=color, family="DM Sans"),
+            xanchor="right", bgcolor="rgba(250,250,247,0.85)",
+            bordercolor=color, borderwidth=1, borderpad=4)
+
+    # ── Layout ─────────────────────────────────────────────────────────
+    all_vals = list(h_obs) + (list(hp) if has_pred else [])
+    y_min = max(min(all_vals) * 0.94, 0) if all_vals else 3000
+    y_max = max(all_vals) * 1.04         if all_vals else 8000
+
+    layout = _plotly_layout_base(
+        f"Hippocampus Volume — RID {p['rid']}", "Volume (mm³)", 420)
+    layout["yaxis"]["range"]      = [y_min, y_max]
+    layout["yaxis"]["tickformat"] = ",.0f"
+    layout["xaxis"]["dtick"]      = 1
+    fig.update_layout(**layout)
     return fig
 
 
