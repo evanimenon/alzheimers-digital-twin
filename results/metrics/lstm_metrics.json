@@ -1,10 +1,10 @@
 {
   "mmse_mae": 1.7603,
   "mmse_r2": 0.6885,
-  "hippo_mae": 69.46,
+  "hippo_mae": 69.47,
   "hippo_r2": 0.9898,
-  "clf3_cv_accuracy": 0.767,
-  "clf3_cv_accuracy_std": 0.017,
-  "mci_conv_auc_cv": 0.9006,
-  "mci_conv_auc_cv_std": 0.0296
+  "clf3_cv_accuracy": 0.7658,
+  "clf3_cv_accuracy_std": 0.0134,
+  "mci_conv_auc_cv": 0.8996,
+  "mci_conv_auc_cv_std": 0.0314
 }
