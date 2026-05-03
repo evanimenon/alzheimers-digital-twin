@@ -34,6 +34,7 @@ TEAM_MEMBERS = [
 
 # ── Gallery manifests ─────────────────────────────────────────────────────────
 GALLERY_VISUALS: list[tuple[str, str]] = [
+    ("visualizations/brain_atrophy_3d.png",       "3D brain atrophy — baseline vs 24 months"),
     ("visualizations/results_dashboard.png",      "Consolidated analysis dashboard"),
     ("visualizations/population_trajectories.png","Population trajectories"),
     ("visualizations/demo_trajectories.png",      "Demo patient trajectories"),
@@ -57,6 +58,27 @@ GALLERY_METRICS_PNG: list[tuple[str, str]] = [
 
 # ── Lightbox image info (titles + layman explanations, keyed by filename stem) ─
 _IMAGE_INFO: dict[str, dict[str, str]] = {
+    "brain_atrophy_3d": {
+        "title": "3D Brain Atrophy: Baseline vs 24 Months",
+        "html": (
+            "<p>This is the digital twin's most visual output — a 3D model of a real patient's "
+            "brain, coloured by how much tissue is predicted to have shrunk at each location.</p>"
+            "<p><strong>Blue/yellow regions</strong> are relatively healthy — the brain is "
+            "maintaining its structure there. <strong>Orange and red regions</strong> indicate "
+            "atrophy: the brain is losing tissue, and the warmer the colour, the more severe "
+            "the loss.</p>"
+            "<p><strong>Left brain (Baseline):</strong> The patient's brain at their first clinic "
+            "visit. The red hotspot in the medial temporal lobe marks the hippocampus — already "
+            "showing early atrophy at 5,256 mm³, below the healthy reference of ~6,000 mm³.</p>"
+            "<p><strong>Right brain (24 months later):</strong> The same patient two years on. "
+            "The hippocampus has shrunk further to 4,836 mm³ — an 8% volume loss. More "
+            "critically, the MMSE cognitive score has collapsed from 27 to just 8 out of 30, "
+            "and the atrophy has spread outward to parietal and frontal regions.</p>"
+            "<p>The brain shape itself comes from a standard MRI atlas (MNI152). The atrophy "
+            "heatmap is driven entirely by this patient's real ADNI measurements — making it "
+            "a true personalised digital twin visualisation.</p>"
+        ),
+    },
     "results_dashboard": {
         "title": "The Big Picture: Results Dashboard",
         "html": (
@@ -591,14 +613,14 @@ def _demo_patient(demo: dict, rid: str) -> dict | None:
 
 def _plotly_layout_base(title: str, yaxis_title: str, height: int = 400) -> dict:
     return dict(
-        title=dict(text=title, font=dict(family="Fraunces, Georgia, serif", size=16,
-                                          color="#121211"), x=0, xanchor="left"),
+        title=dict(text=title, font=dict(family="Fraunces, Georgia, serif", size=15,
+                                          color="#121211"), x=0, xanchor="left",
+                   pad=dict(t=4, b=4)),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafaf7",
         font=dict(family="DM Sans, sans-serif", size=12, color="#3c3c38"),
-        margin=dict(l=52, r=28, t=108, b=52), height=height,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left",
-                    x=0, bgcolor="rgba(0,0,0,0)", font=dict(size=12),
-                    entrywidth=180, entrywidthmode="pixels"),
+        margin=dict(l=56, r=28, t=80, b=56), height=height,
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="right",
+                    x=1, bgcolor="rgba(0,0,0,0)", font=dict(size=11)),
         xaxis=dict(title=dict(text="Visit number", font=dict(size=11, color="#7a7a73")),
                    gridcolor="#e6e6e0", zeroline=False, linecolor="#e6e6e0"),
         yaxis=dict(title=dict(text=yaxis_title, font=dict(size=11, color="#7a7a73")),
@@ -767,11 +789,21 @@ def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
         sign  = "▼" if pct_change < 0 else "▲"
         color = "#ef5350" if pct_change < -3 else "#8fa396"
         fig.add_annotation(
-            xref="paper", yref="paper", x=0.98, y=0.06,
+            xref="paper",
+            yref="paper",
+            x=0.98,
+            y=0.08,  # slightly higher → better spacing
             text=f"{sign} {abs(pct_change):.1f}% projected atrophy",
-            showarrow=False, font=dict(size=11, color=color, family="DM Sans"),
-            xanchor="right", bgcolor="rgba(250,250,247,0.85)",
-            bordercolor=color, borderwidth=1, borderpad=4)
+            showarrow=False,
+            xanchor="right",
+            yanchor="bottom",  # 🔥 important
+            align="right",     # 🔥 text alignment inside box
+            font=dict(size=11, color=color, family="DM Sans"),
+            bgcolor="rgba(250,250,247,0.9)",
+            bordercolor=color,
+            borderwidth=1,
+            borderpad=6        # 🔥 adds breathing space
+        )
 
     # ── Layout ─────────────────────────────────────────────────────────
     all_vals = list(h_obs) + (list(hp) if has_pred else [])
@@ -813,6 +845,71 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
     return [html.Dl(className="demo-meta__dl", children=dl_children)]
 
 
+# ── Brain atrophy 3D section ──────────────────────────────────────────────────
+BRAIN_HTML_PATH = (RESULTS_ROOT / "visualizations" / "brain_atrophy_3d.html").resolve()
+
+def build_brain_section() -> html.Section:
+    brain_available = BRAIN_HTML_PATH.is_file()
+    iframe_or_placeholder = (
+        html.Iframe(
+            src="/hub-results/visualizations/brain_atrophy_3d.html",
+            style={
+                "width": "100%",
+                "height": "580px",
+                "border": "none",
+                "borderRadius": "8px",
+                "background": "#f5f5f8",
+            },
+        )
+        if brain_available
+        else html.P(
+            "Run 06_brain_visualization.ipynb to generate brain_atrophy_3d.html, "
+            "then reload this page.",
+            className="section__lead",
+        )
+    )
+    return html.Section(id="brain-3d", className="section", children=[
+        html.Div(className="section__inner", children=[
+            html.P("3D Digital Twin", className="section__label"),
+            html.H2("Brain atrophy — baseline vs 24 months.", className="section__title"),
+            html.P(
+                "A personalised 3D model of patient RID 750's brain, coloured by atrophy "
+                "severity at each location. Left: first clinic visit. Right: two years later. "
+                "Driven by real ADNI hippocampus volumes and MMSE scores — rotate to explore.",
+                className="section__lead",
+            ),
+            html.Div(
+                className="brain-stats-row",
+                children=[
+                    html.Div(className="brain-stat", children=[
+                        html.Span("5,256 mm³", className="brain-stat__val"),
+                        html.Span("Hippocampus at baseline", className="brain-stat__label"),
+                    ]),
+                    html.Div(className="brain-stat brain-stat--arrow", children=[
+                        html.Span("↓ 8%", className="brain-stat__val brain-stat__val--warn"),
+                        html.Span("volume loss over 24 months", className="brain-stat__label"),
+                    ]),
+                    html.Div(className="brain-stat", children=[
+                        html.Span("4,836 mm³", className="brain-stat__val"),
+                        html.Span("Hippocampus at 24 months", className="brain-stat__label"),
+                    ]),
+                    html.Div(className="brain-stat", children=[
+                        html.Span("27 → 8", className="brain-stat__val brain-stat__val--warn"),
+                        html.Span("MMSE score (out of 30)", className="brain-stat__label"),
+                    ]),
+                ],
+            ),
+            html.Div(className="brain-iframe-wrap", children=[iframe_or_placeholder]),
+            html.P(
+                "💡 Tip: click and drag to rotate · scroll to zoom · "
+                "double-click to reset view",
+                style={"fontSize": "0.8125rem", "color": "#9a9a92", "marginTop": "0.5rem",
+                       "textAlign": "center"},
+            ),
+        ])
+    ])
+
+
 # ── Demo simulation section ───────────────────────────────────────────────────
 def build_demo_simulation_section() -> html.Section:
     if DEMO_SIM and DEMO_SIM.get("patients"):
@@ -826,8 +923,8 @@ def build_demo_simulation_section() -> html.Section:
             html.Div(className="section__inner", children=[
                 html.P("Interactive", className="section__label"),
                 html.H2("Demo patient simulation.", className="section__title"),
-                html.P("Five demo subjects from results/metrics/demo_data.json "
-                       "observed prefix + LSTM one-step forecasts "
+                html.P("Five demo subjects from results/metrics/demo_data.json, produced when "
+                       "you run 02_lstm_model.ipynb (observed prefix + LSTM one-step forecasts "
                        "on held-out visit indices).", className="section__lead"),
                 html.Div(className="demo-toolbar", children=[
                     html.Label("Patient", className="demo-toolbar__label",
@@ -947,12 +1044,10 @@ def build_layout() -> html.Div:
                     html.Li(html.A("About",      href="#about")),
                     html.Li(html.A("Pipeline",   href="#pipeline")),
                     html.Li(html.A("Metrics",    href="#metrics")),
+                    html.Li(html.A("Brain 3D",   href="#brain-3d")),
                     html.Li(html.A("Demo twin",  href="#demo-simulation")),
                     html.Li(html.A("Gallery",    href="#gallery")),
                     html.Li(html.A("Notebooks",  href="#notebooks")),
-                    html.Li(html.A("GitHub ↗", href="https://github.com/evanimenon/alzheimers-digital-twin",
-                                   target="_blank", rel="noopener noreferrer",
-                                   className="site-nav__github")),
                 ]),
             ])
         ]),
@@ -965,7 +1060,7 @@ def build_layout() -> html.Div:
                     html.H1("Alzheimer's digital twin", className="hero__title"),
                     html.P(
                         "Longitudinal ADNI signals, sequence models, classification, "
-                        "visual analytics, and simulation.",
+                        "visual analytics, and simulation — presented with room to breathe.",
                         className="hero__subtitle",
                     ),
                     html.Div(className="hero__rule"),
@@ -1041,6 +1136,9 @@ def build_layout() -> html.Div:
             html.Section(id="metrics", className="section", children=[
                 html.Div(className="section__inner", children=metrics_children)]),
 
+            # ── 3D Brain Atrophy ──────────────────────────────────────────
+            build_brain_section(),
+
             # ── Demo twin ─────────────────────────────────────────────────
             build_demo_simulation_section(),
 
@@ -1100,12 +1198,6 @@ def build_layout() -> html.Div:
             html.Div(className="site-footer__inner", children=[
                 html.P("Alzheimer's digital twin — exploratory research software. Not a medical device."),
                 html.P(f"Project by {', '.join(TEAM_MEMBERS)}.", className="site-footer__team"),
-                html.P(children=[
-                    html.A("View on GitHub ↗",
-                           href="https://github.com/evanimenon/alzheimers-digital-twin",
-                           target="_blank", rel="noopener noreferrer",
-                           className="site-footer__github"),
-                ]),
             ])
         ]),
 
@@ -1131,14 +1223,57 @@ server = app.server
 
 # ── Custom CSS + JS injected via index_string ─────────────────────────────────
 _CUSTOM_CSS = """
+/* ── Brain 3D section ────────────────────────────────────────────── */
+.brain-stats-row {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin: 1.25rem 0 1.5rem;
+  align-items: stretch;
+}
+.brain-stat {
+  background: #f5f5f8;
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 155px;
+  flex: 1 1 155px;
+}
+.brain-stat__val {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2f4f3f;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.brain-stat__val--warn { color: #c0392b; }
+.brain-stat__label {
+  font-size: 0.72rem;
+  color: #7a7a73;
+  font-family: 'DM Sans', sans-serif;
+  line-height: 1.4;
+}
+.brain-iframe-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e0e0da;
+  background: #0f1114;
+}
+
 /* ── Hero byline ─────────────────────────────────────────────────── */
 .hero__byline {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   font-size: 0.8125rem;
   font-family: 'DM Sans', sans-serif;
   color: #7a7a73;
-  letter-spacing: 0.03em;
-  line-height: 1.6;
+  letter-spacing: 0.02em;
+  line-height: 1.8;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2rem;
 }
 .hero__byline-label {
   color: #8fa396;
@@ -1146,35 +1281,97 @@ _CUSTOM_CSS = """
   text-transform: uppercase;
   font-size: 0.6875rem;
   letter-spacing: 0.1em;
-  margin-right: 0.25rem;
+  margin-right: 0.3rem;
+  flex-shrink: 0;
 }
 
-/* ── GitHub nav link ─────────────────────────────────────────────── */
-.site-nav__github {
-  color: #8fa396 !important;
-  font-weight: 500;
-  border: 1px solid rgba(143,163,150,0.4);
-  border-radius: 5px;
-  padding: 0.25rem 0.65rem !important;
-  font-size: 0.8125rem;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-.site-nav__github:hover {
-  background: rgba(47,79,63,0.07);
-  border-color: #2f4f3f;
-  color: #2f4f3f !important;
-}
-
-/* ── Footer ──────────────────────────────────────────────────────── */
-.site-footer__inner { display: flex; flex-direction: column; gap: 0.2rem; }
+/* ── Footer team line ────────────────────────────────────────────── */
+.site-footer__inner { display: flex; flex-direction: column; gap: 0.25rem; }
 .site-footer__team  { font-size: 0.75rem; color: #9a9a92; }
-.site-footer__github {
-  font-size: 0.75rem;
-  color: #8fa396;
-  text-decoration: none;
-  transition: color 0.18s ease;
+
+/* ── Demo section alignment fixes ───────────────────────────────── */
+.demo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
-.site-footer__github:hover { color: #2f4f3f; }
+.demo-toolbar__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5a5a50;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.demo-dropdown {
+  flex: 1 1 220px;
+  min-width: 220px;
+}
+.demo-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+.chart-wrap {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #ebebе5;
+  overflow: hidden;
+  min-width: 0;
+}
+.chart-wrap--demo {
+  background: #fafaf7;
+  border: 1px solid #e8e8e2;
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 0;
+  padding-top: 0;
+}
+/* Ensure Dash graph containers don't overflow */
+.chart-wrap .js-plotly-plot,
+.chart-wrap--demo .js-plotly-plot {
+  width: 100% !important;
+}
+.demo-meta {
+  margin: 0.75rem 0 0;
+  padding: 0.875rem 1rem;
+  background: #f8f8f5;
+  border-radius: 8px;
+  border: 1px solid #ebebе5;
+}
+.demo-meta__dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 1.25rem;
+  margin: 0;
+}
+.demo-meta__dt {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #7a7a73;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.demo-meta__dd {
+  font-size: 0.8125rem;
+  color: #3c3c38;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+  word-break: break-word;
+}
+.demo-meta__empty {
+  font-size: 0.875rem;
+  color: #7a7a73;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .demo-charts { grid-template-columns: 1fr; }
+}
 
 /* ── Gallery card — hover & click affordance ─────────────────────── */
 .figure-card {
@@ -1260,7 +1457,7 @@ _CUSTOM_CSS = """
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 1.75rem;
   min-height: 400px;
   overflow: hidden;
 }
@@ -1278,7 +1475,7 @@ _CUSTOM_CSS = """
   background: #fafaf7;
   display: flex;
   flex-direction: column;
-  padding: 1.75rem 1.75rem 1.25rem;
+  padding: 2.25rem 2rem 1.5rem;
   overflow-y: auto;
   position: relative;
 }
@@ -1289,38 +1486,38 @@ _CUSTOM_CSS = """
   letter-spacing: 0.12em;
   color: #8fa396;
   font-weight: 500;
-  margin-bottom: 0.375rem;
+  margin-bottom: 0.5rem;
 }
 .lb-title {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-family: 'Fraunces', Georgia, serif;
   color: #121211;
   font-weight: 500;
   line-height: 1.35;
-  margin: 0 2.5rem 1rem 0;
+  margin: 0 2.5rem 1.25rem 0;
 }
 .lb-divider {
   width: 36px;
   height: 2px;
   background: #2f4f3f;
   border-radius: 2px;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   flex-shrink: 0;
 }
 .lb-explanation {
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-family: 'DM Sans', sans-serif;
   color: #4a4a44;
-  line-height: 1.72;
+  line-height: 1.78;
   flex: 1;
 }
-.lb-explanation p          { margin: 0 0 0.75rem; }
+.lb-explanation p          { margin: 0 0 0.875rem; }
 .lb-explanation p:last-child { margin-bottom: 0; }
 .lb-explanation strong     { color: #2f4f3f; font-weight: 600; }
 .lb-explanation em         { color: #5a5a50; }
-.lb-explanation ul         { margin: 0.375rem 0 0.75rem; padding-left: 1.25rem; }
-.lb-explanation li         { margin-bottom: 0.3rem; }
-.lb-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e6e6e0; }
+.lb-explanation ul         { margin: 0.5rem 0 0.875rem; padding-left: 1.25rem; }
+.lb-explanation li         { margin-bottom: 0.4rem; }
+.lb-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e6e6e0; }
 .lb-scroll-hint {
   font-size: 0.75rem;
   color: #b0b0a8;
@@ -1331,15 +1528,15 @@ _CUSTOM_CSS = """
 /* ── Close button ────────────────────────────────────────────────── */
 .lb-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 1.875rem;
-  height: 1.875rem;
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
   border: none;
   background: rgba(0,0,0,0.07);
   color: #3c3c38;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -1354,7 +1551,7 @@ _CUSTOM_CSS = """
 @media (max-width: 740px) {
   .lb-card { flex-direction: column; width: 96vw; }
   .lb-img-pane { flex: none; max-height: 38vh; padding: 1rem; }
-  .lb-info-pane { flex: 1; min-height: 0; padding: 1.25rem 1.1rem; }
+  .lb-info-pane { flex: 1; min-height: 0; padding: 1.5rem 1.25rem; }
   .lb-title { font-size: 1.05rem; margin-right: 2rem; }
 }
 """
@@ -1484,7 +1681,7 @@ def hub_results(subpath: str):
         candidate.relative_to(RESULTS_ROOT)
     except (ValueError, OSError):
         abort(404)
-    if not candidate.is_file() or candidate.suffix.lower() != ".png":
+    if not candidate.is_file() or candidate.suffix.lower() not in (".png", ".html"):
         abort(404)
     return send_from_directory(str(candidate.parent), candidate.name)
 
