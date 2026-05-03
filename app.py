@@ -1,5 +1,6 @@
 """
 Alzheimer's Digital Twin — project hub (Dash).
+Updated: team names · interactive gallery lightbox · layman-friendly explanations.
 
 Run from repo root:  python app.py
 Then open http://127.0.0.1:8050
@@ -21,27 +22,345 @@ SIMULATION_PATH = ROOT / "results" / "metrics" / "simulation_summary.json"
 DEMO_DATA_PATH = ROOT / "results" / "metrics" / "demo_data.json"
 RESULTS_ROOT = (ROOT / "results").resolve()
 
-# Curated gallery: relative to results/ — only these paths are linked from the UI.
+# ── Team ──────────────────────────────────────────────────────────────────────
+TEAM_MEMBERS = [
+    "Evani Menon",
+    "Manojna Reddy Kamaram",
+    "Diksha Kaushik",
+    "Ishaan Arora",
+    "Palak",
+    "Isobel Kuriyan",
+]
+
+# ── Gallery manifests ─────────────────────────────────────────────────────────
 GALLERY_VISUALS: list[tuple[str, str]] = [
-    ("visualizations/results_dashboard.png", "Consolidated analysis dashboard"),
-    ("visualizations/population_trajectories.png", "Population trajectories"),
-    ("visualizations/demo_trajectories.png", "Demo patient trajectories"),
-    ("visualizations/hippocampus_atrophy.png", "Hippocampus atrophy"),
-    ("visualizations/monte_carlo_ci.png", "Monte Carlo uncertainty"),
-    ("visualizations/all_patients_simulation.png", "All-patient simulation"),
-    ("visualizations/subgroup_analysis.png", "Subgroup analysis"),
-    ("visualizations/what_if_apoe4.png", "What-if: APOE4"),
-    ("visualizations/what_if_intervention.png", "What-if: intervention"),
+    ("visualizations/results_dashboard.png",      "Consolidated analysis dashboard"),
+    ("visualizations/population_trajectories.png","Population trajectories"),
+    ("visualizations/demo_trajectories.png",      "Demo patient trajectories"),
+    ("visualizations/hippocampus_atrophy.png",    "Hippocampus atrophy"),
+    ("visualizations/monte_carlo_ci.png",         "Monte Carlo uncertainty"),
+    ("visualizations/all_patients_simulation.png","All-patient simulation"),
+    ("visualizations/subgroup_analysis.png",      "Subgroup analysis"),
+    ("visualizations/what_if_apoe4.png",          "What-if: APOE4"),
+    ("visualizations/what_if_intervention.png",   "What-if: intervention"),
 ]
 
 GALLERY_METRICS_PNG: list[tuple[str, str]] = [
-    ("metrics/confusion_matrix.png", "Confusion matrix (classification)"),
-    ("metrics/roc_curves.png", "ROC curves"),
+    ("metrics/confusion_matrix.png",   "Confusion matrix (classification)"),
+    ("metrics/roc_curves.png",         "ROC curves"),
     ("metrics/feature_importance.png", "Feature importance"),
-    ("metrics/shap_importance.png", "SHAP summary"),
+    ("metrics/shap_importance.png",    "SHAP summary"),
+    ("metrics/training_curves.png",    "LSTM training curves"),
+    ("metrics/lstm_eval_plots.png",    "LSTM evaluation plots"),
+    ("metrics/evaluation.png",         "Hippocampus prediction accuracy"),
 ]
 
+# ── Lightbox image info (titles + layman explanations, keyed by filename stem) ─
+_IMAGE_INFO: dict[str, dict[str, str]] = {
+    "results_dashboard": {
+        "title": "The Big Picture: Results Dashboard",
+        "html": (
+            "<p>Think of this as the project's master report card — six panels that tell the "
+            "complete story at once.</p>"
+            "<p><strong>Panel A (top-left)</strong> counts patients: 1,591 cognitively normal (CN), "
+            "1,564 with Mild Cognitive Impairment (MCI), and 595 with dementia. MCI is the "
+            "crucial middle stage where early action is most possible.</p>"
+            "<p><strong>Panel B (top-centre)</strong> shows how memory-test (MMSE) scores are "
+            "distributed across each group. Healthy people cluster near 30 (perfect score); "
+            "dementia patients spread lower. This three-way separation is exactly what the "
+            "model learns to detect.</p>"
+            "<p><strong>Panel C (top-right)</strong> is the headline scorecard. White bars are "
+            "the targets we set; coloured bars are where we landed. The MCI→Dementia AUC "
+            "of 0.9 means the model is excellent at ranking future risk.</p>"
+            "<p><strong>Panels D–F</strong> dig deeper: how fast each group declines per visit, "
+            "how brain volume correlates with cognition, and how carrying the APOE4 risk gene "
+            "dramatically shifts the proportion of dementia patients.</p>"
+        ),
+    },
+    "population_trajectories": {
+        "title": "Three Paths: How Each Group Changes Over Time",
+        "html": (
+            "<p>Each coloured line is one real patient's MMSE memory-test score tracked across "
+            "multiple clinic visits. What you are seeing is Alzheimer's progression — or its "
+            "absence — in raw form.</p>"
+            "<p><strong>Blue lines (Cognitively Normal):</strong> Scores stay high (27–30) and "
+            "relatively flat. These patients are not declining.</p>"
+            "<p><strong>Orange lines (MCI):</strong> Scores hover in the mid-range (24–28). "
+            "There is more variation — some people are stable, others slowly slipping.</p>"
+            "<p><strong>Red lines (Dementia):</strong> These start lower and trend downward. "
+            "The thick bold lines are each group's average. The clear separation between the "
+            "three groups validates that the data contains the signal needed to train the model.</p>"
+            "<p>The dotted horizontal line at MMSE = 24 is the clinical threshold for MCI. "
+            "Patients who cross below this line are flagged for closer monitoring.</p>"
+        ),
+    },
+    "demo_trajectories": {
+        "title": "5 Real Patients: Observed vs. Predicted",
+        "html": (
+            "<p>This chart focuses on 5 specific patients from the ADNI dataset. "
+            "Each panel covers a single person's journey.</p>"
+            "<p>The <strong>solid coloured line</strong> shows their actual measured MMSE scores "
+            "at each clinic visit — this is ground truth, real data from real people.</p>"
+            "<p>The <strong>dashed purple line</strong> is the model's prediction of what would "
+            "happen after their last observed visit, using only the history up to that point. "
+            "Where the dashed line closely follows subsequent real data, the model is accurately "
+            "forecasting the patient's future.</p>"
+            "<p>The horizontal dotted line at MMSE = 24 marks the MCI clinical threshold. "
+            "All five patients are diagnosed with dementia, which is why most trajectories "
+            "trend toward or below this line. Labels above each panel show the patient's ID, "
+            "APOE4 status, and total MMSE drop observed during the study.</p>"
+        ),
+    },
+    "hippocampus_atrophy": {
+        "title": "Brain Shrinkage: Tracking the Hippocampus",
+        "html": (
+            "<p>The hippocampus is a small seahorse-shaped region deep in the brain — "
+            "and it is the first area to shrink in Alzheimer's disease. This chart tracks "
+            "its volume (in cubic millimetres, mm³) at each clinic visit for 5 patients.</p>"
+            "<p>Each bar represents one visit. <strong>Shorter bars = less hippocampal "
+            "tissue.</strong> The white overlay line traces the trend. A falling line means "
+            "the brain is losing tissue — a direct biological marker of disease progression.</p>"
+            "<p><strong>Patient RID 667</strong> shows the most dramatic loss — a 28.7% drop "
+            "(2,326 mm³), which is clinically significant. Compare that to "
+            "<strong>RID 128</strong> with only a 1.3% change — very stable despite a dementia "
+            "diagnosis.</p>"
+            "<p>This variability demonstrates why personalised digital twins matter: "
+            "one-size-fits-all treatment models miss the huge differences between individuals.</p>"
+        ),
+    },
+    "monte_carlo_ci": {
+        "title": "How Certain Are We? Monte Carlo Uncertainty Bands",
+        "html": (
+            "<p>Rather than making a single prediction, the model was run 200 times with "
+            "small random variations — a technique called <strong>Monte Carlo simulation</strong>. "
+            "This gives a range of possible futures, not just one answer.</p>"
+            "<p>The <strong>shaded bands</strong> represent this range. The darker inner band "
+            "covers 50% of all simulations; the lighter outer band covers 90%. "
+            "Narrow bands = the model is confident. Wide bands = more uncertainty.</p>"
+            "<p><strong>Left chart (MMSE):</strong> The 90% confidence interval is only about "
+            "1 MMSE point wide at the last visit — very tight. The model is highly consistent "
+            "in its cognitive forecasts for this patient.</p>"
+            "<p><strong>Right chart (Hippocampus):</strong> The band is somewhat wider, "
+            "reflecting that brain volume is harder to pin down precisely. But the central "
+            "prediction still shows a clear downward trend in brain volume over time.</p>"
+        ),
+    },
+    "all_patients_simulation": {
+        "title": "Natural Course vs. Early Intervention: All 5 Patients",
+        "html": (
+            "<p>This is the digital twin's most powerful use case: asking <em>'what if?'</em> "
+            "Each panel shows one patient's future under two competing scenarios.</p>"
+            "<p>The <strong>solid coloured line</strong> is the real historical data. "
+            "The <strong>dashed lines</strong> project two futures: the natural trajectory "
+            "(no intervention) and a '40% slowdown' scenario (a hypothetical treatment that "
+            "reduces the rate of cognitive decline by 40%).</p>"
+            "<p>The gap between the two dashed lines is the treatment benefit. Even a 40% "
+            "slowdown compounds significantly over 12 visits — potentially keeping a patient "
+            "above the critical MCI threshold for years longer than they would otherwise be.</p>"
+            "<p>This type of counterfactual simulation is exactly how pharmaceutical companies "
+            "evaluate hypothetical treatments before clinical trials, using patient data to "
+            "estimate likely outcomes without exposing anyone to risk.</p>"
+        ),
+    },
+    "subgroup_analysis": {
+        "title": "By the Numbers: Group-Level Comparisons",
+        "html": (
+            "<p>A clean statistical comparison of the three diagnosis groups across three "
+            "key dimensions.</p>"
+            "<p><strong>Panel 1 — Mean MMSE ± standard deviation:</strong> CN patients average "
+            "29.0 (near perfect), MCI patients 27.5, and dementia patients 21.6. "
+            "The error bars show spread within each group — dementia has the widest spread, "
+            "reflecting how heterogeneous the disease is from person to person.</p>"
+            "<p><strong>Panel 2 — Mean Hippocampus Volume:</strong> CN patients have the "
+            "largest hippocampi (~5,945 mm³), followed by MCI (~5,778), and dementia the "
+            "smallest (~5,483). The differences are statistically meaningful — this is brain "
+            "tissue, and even small percentage losses matter clinically.</p>"
+            "<p><strong>Panel 3 — Visits per patient:</strong> Most patients attended only "
+            "2–3 visits, giving a limited longitudinal window. This is a real constraint of "
+            "observational studies — people move, withdraw, or simply stop attending.</p>"
+        ),
+    },
+    "what_if_apoe4": {
+        "title": "What If Your Genetics Were Different? APOE4 Scenarios",
+        "html": (
+            "<p>The <strong>APOE4 gene variant</strong> is the most well-known genetic risk "
+            "factor for late-onset Alzheimer's. You can inherit 0, 1, or 2 copies — more "
+            "copies means higher risk.</p>"
+            "<p>This chart takes one real patient (RID 750) and asks: <em>holding everything "
+            "else equal, how would their future trajectory change based solely on their "
+            "APOE4 count?</em></p>"
+            "<p><strong>Blue (APOE4 = 0, low risk):</strong> The model predicts the highest "
+            "sustained MMSE scores and the most stable hippocampus volume over 6 future visits.</p>"
+            "<p><strong>Orange (APOE4 = 1, moderate risk):</strong> Slightly lower cognitive "
+            "trajectory and marginally faster brain shrinkage.</p>"
+            "<p><strong>Red (APOE4 = 2, high risk):</strong> The steepest predicted decline. "
+            "The spread between low and high risk is roughly 4 MMSE points — clinically "
+            "meaningful, as it can be the difference between scoring above or below the MCI "
+            "threshold on any given visit.</p>"
+        ),
+    },
+    "what_if_intervention": {
+        "title": "What If We Could Slow the Decline? Intervention Scenarios",
+        "html": (
+            "<p>For patient RID 750, this chart models four futures based on how effective a "
+            "hypothetical treatment might be at slowing disease progression.</p>"
+            "<p><strong>Red (No intervention):</strong> The baseline 'do nothing' path — "
+            "cognitive and brain decline continue at the natural predicted rate.</p>"
+            "<p><strong>Orange (20% slowdown):</strong> A modest treatment reduces the "
+            "decline rate by one-fifth. The MMSE line is slightly higher; the hippocampus "
+            "shrinks a little more slowly.</p>"
+            "<p><strong>Green (40% slowdown):</strong> A stronger treatment cuts decline "
+            "nearly in half. The benefit becomes clearly visible, especially in the "
+            "hippocampus panel on the right, where the lines diverge significantly over time.</p>"
+            "<p><strong>Blue (Complete halt):</strong> A theoretical ceiling — if progression "
+            "could be completely stopped, scores stay flat. This serves as an upper bound "
+            "to compare other scenarios against.</p>"
+            "<p>Key insight: even small interventions <em>compound</em> over time. "
+            "Starting treatment early matters enormously.</p>"
+        ),
+    },
+    "confusion_matrix": {
+        "title": "How Often Does the Classifier Get It Right?",
+        "html": (
+            "<p>A confusion matrix is a grid comparing what the model <em>predicted</em> "
+            "(columns) against what was <em>actually true</em> (rows). "
+            "The diagonal numbers are correct predictions; everything off-diagonal is a mistake.</p>"
+            "<p><strong>Reading the grid:</strong></p>"
+            "<ul>"
+            "<li>The model correctly identified <strong>155 out of 207 CN patients</strong> "
+            "(75%), with 52 misclassified as MCI.</li>"
+            "<li>It correctly identified <strong>327 out of 367 dementia patients</strong> "
+            "(89%) — very strong performance on the most critical class.</li>"
+            "<li>It correctly identified <strong>208 out of 325 MCI patients</strong> "
+            "(64%) — MCI is the hardest class because it sits between normal and dementia.</li>"
+            "</ul>"
+            "<p>Overall cross-validated accuracy is 77%. The most common mistake is "
+            "confusing MCI with dementia — which is also a challenge for human clinicians, "
+            "since MCI is inherently a borderline diagnosis.</p>"
+        ),
+    },
+    "roc_curves": {
+        "title": "Detecting Future Dementia: The ROC Curve",
+        "html": (
+            "<p>This chart measures how well the model identifies which MCI patients will "
+            "eventually progress to dementia — a crucial clinical prediction.</p>"
+            "<p>The <strong>ROC curve</strong> (blue line) shows the trade-off between "
+            "catching true cases (sensitivity, y-axis) and avoiding false alarms "
+            "(1-specificity, x-axis). A perfect model curves sharply to the top-left corner. "
+            "A random guess follows the diagonal dashed line.</p>"
+            "<p>The <strong>AUC = 0.892</strong> means that 89.2% of the time, the model "
+            "correctly ranks a patient who will develop dementia as higher risk than one who "
+            "will not. In clinical screening, an AUC above 0.85 is considered excellent.</p>"
+            "<p>The orange crosshairs mark a useful operating point: at roughly 20% false "
+            "positive rate, we achieve about 80% true positive rate — catching 4 out of 5 "
+            "future dementia cases while only falsely flagging 1 in 5 currently healthy patients.</p>"
+        ),
+    },
+    "feature_importance": {
+        "title": "What Clues Matter Most? XGBoost Feature Importance",
+        "html": (
+            "<p>These bar charts show which data variables the XGBoost classification model "
+            "relies on most when deciding a patient's diagnosis or predicting conversion.</p>"
+            "<p><strong>Left chart — 3-class (CN / MCI / Dementia):</strong> The most recent "
+            "MMSE score dominates by a wide margin. Your current cognitive performance is the "
+            "single best predictor of your diagnosis. Number of visits and baseline MMSE "
+            "round out the top three.</p>"
+            "<p><strong>Right chart — MCI → Dementia conversion:</strong> Current MMSE leads "
+            "again, but now 'total MMSE drop' jumps to second place — because the "
+            "<em>trajectory</em> of decline matters more than just the current score when "
+            "predicting whether MCI will eventually convert to dementia.</p>"
+            "<p>Notably, APOE4 (genetics) ranks near the bottom in both charts. This does "
+            "not mean genetics are unimportant — it means their effect is likely already "
+            "captured through the cognitive and imaging measurements.</p>"
+        ),
+    },
+    "shap_importance": {
+        "title": "A Deeper Look at Impact: SHAP Analysis",
+        "html": (
+            "<p>SHAP (SHapley Additive exPlanations) is a rigorous method for understanding "
+            "exactly how much each feature changes the model's prediction for individual "
+            "patients — going beyond simple feature importance rankings.</p>"
+            "<p>The bar chart shows the average absolute SHAP value for each feature. "
+            "A longer bar means that feature has a bigger impact on individual predictions "
+            "across the dataset.</p>"
+            "<p><strong>MMSE last</strong> (most recent cognitive score) has by far the "
+            "largest impact. <strong>n visits</strong> (how long someone has been in the study) "
+            "is second — a proxy for disease duration. "
+            "<strong>MMSE slope and Hippo slope</strong> follow — capturing the rate of "
+            "change, not just the current state.</p>"
+            "<p>SHAP makes the model interpretable: a clinician can see exactly <em>why</em> "
+            "a patient was flagged as high-risk, rather than treating the AI as a black box. "
+            "This kind of transparency is essential for clinical adoption.</p>"
+        ),
+    },
+    "training_curves": {
+        "title": "Did the Model Actually Learn? LSTM Training Curves",
+        "html": (
+            "<p>These two charts show the LSTM neural network learning in real time "
+            "across 50 training epochs — one epoch means the model processed every "
+            "training example once.</p>"
+            "<p><strong>Left chart (Loss curves):</strong> Both training loss (blue) and "
+            "validation loss (orange) start high and fall steeply — this is exactly what "
+            "healthy learning looks like. Crucially, the validation curve follows the training "
+            "curve closely without flattening early. This means the model is generalising "
+            "to unseen data rather than memorising the training set (overfitting).</p>"
+            "<p><strong>Right chart (Validation MAE vs. Baseline):</strong> The purple line "
+            "shows prediction error on new data dropping from 6.5 MMSE points all the way "
+            "down to about 3.1. The dashed orange line at 3.5 is the naive baseline (just use "
+            "the last known score as your prediction). Our LSTM beats this baseline around "
+            "epoch 40 — proving it learned genuine patterns that a simple heuristic cannot.</p>"
+        ),
+    },
+    "lstm_eval_plots": {
+        "title": "LSTM Prediction Quality: Three Lenses",
+        "html": (
+            "<p>Three panels that together paint a complete picture of how well the LSTM "
+            "predicts cognitive scores.</p>"
+            "<p><strong>Left — Predicted vs. Actual MMSE (R² = 0.689):</strong> Each blue "
+            "dot is one patient visit. Dots close to the red diagonal line = accurate "
+            "predictions. An R² of 0.689 means the model explains 69% of the variation in "
+            "MMSE scores — respectable for a noisy biological outcome.</p>"
+            "<p><strong>Centre — Residual Distribution:</strong> 'Residual' means predicted "
+            "minus actual. A good model has residuals clustered tightly around zero — no "
+            "systematic bias in either direction. The purple distribution here is centred "
+            "at zero and bell-shaped, which is exactly what we want.</p>"
+            "<p><strong>Right — Baseline vs. LSTM MAE:</strong> A simple baseline (just "
+            "repeat the last score) makes an average error of 3.5 MMSE points. Our LSTM "
+            "achieves 1.76 — cutting the error in half. In clinical terms, being wrong by "
+            "1.76 points instead of 3.5 on a 30-point scale is a meaningful improvement.</p>"
+        ),
+    },
+    "evaluation": {
+        "title": "Hippocampus Volume Predictions: Near-Perfect Accuracy",
+        "html": (
+            "<p>Each green dot represents one patient visit where the model predicted their "
+            "hippocampus volume (y-axis) and we compared it to the actual MRI measurement "
+            "(x-axis). The dashed diagonal line is perfect prediction.</p>"
+            "<p>The dots hug the diagonal almost perfectly — the LSTM achieves R² = 0.99 "
+            "and a Mean Absolute Error of just 69 mm³. With average hippocampus volumes "
+            "around 5,000 mm³, a 69 mm³ error is less than 1.4% — exceptional accuracy "
+            "for a neural sequence model.</p>"
+            "<p>Why is this so much better than MMSE prediction? Brain volume measured by "
+            "MRI is a more stable biological measurement than a cognitive test score. MRI "
+            "volumes do not fluctuate day-to-day due to mood, sleep, or test anxiety — so "
+            "there is less 'noise' for the model to fight against.</p>"
+            "<p>This result validates that the digital twin can faithfully track biological "
+            "disease markers, not just cognitive symptoms.</p>"
+        ),
+    },
+}
 
+# Serialise to a JS const that can be embedded in the page
+_JS_IMAGE_INFO_CONST = "const IMAGE_INFO = " + json.dumps(_IMAGE_INFO, ensure_ascii=False) + ";"
+
+
+# ── Helper: friendly title for gallery captions ───────────────────────────────
+def _gallery_title(rel: str, fallback: str) -> str:
+    stem = Path(rel).stem
+    return _IMAGE_INFO.get(stem, {}).get("title", fallback)
+
+
+# ── Data loading ──────────────────────────────────────────────────────────────
 def load_metrics() -> dict | None:
     if not METRICS_PATH.exists():
         return None
@@ -60,25 +379,7 @@ def load_simulation_summary() -> dict | None:
         return None
 
 
-def _hippo_for_visits(features: list, visit_list: list[float]) -> list[float]:
-    """Map ADNI visit_num → hippocampus volume from feature rows [MMSE, Hippo, APOE4, Edu, visit_num]."""
-    by_v: dict[int, float] = {}
-    for row in features:
-        if len(row) < 5:
-            continue
-        vn = int(float(row[4]))
-        by_v[vn] = float(row[1])
-    out: list[float] = []
-    for v in visit_list:
-        out.append(float(by_v.get(int(float(v)), float("nan"))))
-    return out
-
-
 def normalize_team_demo_data(raw: dict) -> dict | None:
-    """
-    Convert results/metrics/demo_data.json (from 02_lstm_model.ipynb) into the
-    internal shape expected by the demo twin charts.
-    """
     if not raw:
         return None
     patients: dict[str, dict] = {}
@@ -93,34 +394,23 @@ def normalize_team_demo_data(raw: dict) -> dict | None:
         om = [float(x) for x in blob["observed_mmse"]]
         pv = [float(x) for x in blob.get("pred_visits", [])]
         pm = [float(x) for x in blob.get("pred_mmse", [])]
-        feats = blob.get("features", [])
-        ho = _hippo_for_visits(feats, ov)
-        hp = _hippo_for_visits(feats, pv)
+        # Read hippocampus directly from the exported arrays written by the notebook
+        ho = [float(x) for x in blob.get("observed_hippo", [])]
+        hp = [float(x) for x in blob.get("pred_hippo", [])]
         try:
             apoe_f = float(blob.get("apoe4", 0) or 0)
         except (TypeError, ValueError):
             apoe_f = 0.0
         patients[sk] = {
-            "rid": rid,
-            "apoe4": apoe_f,
-            "dx_last": str(blob.get("dx_last", "—")),
-            "n_obs_visits": len(ov),
-            "visits_obs": ov,
-            "mmse_obs": om,
-            "hippo_obs": ho,
-            "pred_visits": pv,
-            "mmse_pred": pm,
-            "hippo_pred": hp,
+            "rid": rid, "apoe4": apoe_f, "dx_last": str(blob.get("dx_last", "—")),
+            "n_obs_visits": len(ov), "visits_obs": ov, "mmse_obs": om,
+            "hippo_obs": ho, "pred_visits": pv, "mmse_pred": pm, "hippo_pred": hp,
         }
         demo_rids.append(rid)
     if not patients:
         return None
-    return {
-        "version": 1,
-        "prediction_method": "notebook_02_export",
-        "demo_rids": demo_rids,
-        "patients": patients,
-    }
+    return {"version": 1, "prediction_method": "notebook_02_export",
+            "demo_rids": demo_rids, "patients": patients}
 
 
 def load_demo_simulation() -> dict | None:
@@ -137,257 +427,162 @@ DEMO_SIM = load_demo_simulation()
 
 
 def hub_asset_url(rel: str) -> str:
-    """URL path served by hub_results (relative to results/)."""
     return f"/hub-results/{rel.replace(chr(92), '/')}"
 
 
+# ── Plotly figures ────────────────────────────────────────────────────────────
 def metrics_figure(data: dict | None) -> go.Figure:
     if not data or not all(k in data for k in ("mmse_mae", "mmse_r2", "hippo_mae", "hippo_r2")):
         fig = go.Figure()
         fig.add_annotation(
-            text="No regression metrics yet.<br><sub>Export MMSE / hippocampus metrics to lstm_metrics.json</sub>",
-            xref="paper",
-            yref="paper",
-            x=0.5,
-            y=0.5,
-            showarrow=False,
+            text="No regression metrics yet.<br><sub>Export metrics to lstm_metrics.json</sub>",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
             font=dict(size=14, color="#7a7a73"),
         )
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=40, r=40, t=40, b=40),
-            height=320,
-        )
+        fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                          margin=dict(l=40, r=40, t=40, b=40), height=320)
         return fig
-
-    mmse_mae = float(data["mmse_mae"])
-    mmse_r2 = float(data["mmse_r2"])
-    hippo_mae = float(data["hippo_mae"])
-    hippo_r2 = float(data["hippo_r2"])
-
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        subplot_titles=("Mean absolute error", "R² (coefficient of determination)"),
-        vertical_spacing=0.22,
-    )
-    fig.add_trace(
-        go.Bar(
-            x=["MMSE", "Hippocampus"],
-            y=[mmse_mae, hippo_mae],
-            marker=dict(color="#2f4f3f", line=dict(width=0)),
-            text=[f"{mmse_mae:.2f}", f"{hippo_mae:.1f}"],
-            textposition="outside",
-            textfont=dict(size=11, color="#3c3c38"),
-            showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
-    fig.add_trace(
-        go.Bar(
-            x=["MMSE", "Hippocampus"],
-            y=[mmse_r2, hippo_r2],
-            marker=dict(color="#8fa396", line=dict(width=0)),
-            text=[f"{mmse_r2:.3f}", f"{hippo_r2:.4f}"],
-            textposition="outside",
-            textfont=dict(size=11, color="#3c3c38"),
-            showlegend=False,
-        ),
-        row=2,
-        col=1,
-    )
-    axis_style = dict(
-        showgrid=True,
-        gridcolor="#e6e6e0",
-        zeroline=False,
-        linecolor="#e6e6e0",
-        tickfont=dict(size=11),
-    )
-    fig.update_xaxes(axis_style, row=1, col=1)
-    fig.update_xaxes(axis_style, row=2, col=1)
-    fig.update_yaxes(axis_style, row=1, col=1)
-    fig.update_yaxes(axis_style, row=2, col=1)
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#fafaf7",
-        font=dict(family="DM Sans, sans-serif", color="#3c3c38", size=12),
-        margin=dict(l=44, r=28, t=72, b=36),
-        height=360,
-    )
+    mmse_mae, mmse_r2 = float(data["mmse_mae"]), float(data["mmse_r2"])
+    hippo_mae, hippo_r2 = float(data["hippo_mae"]), float(data["hippo_r2"])
+    fig = make_subplots(rows=2, cols=1,
+                        subplot_titles=("Mean absolute error", "R² (coefficient of determination)"),
+                        vertical_spacing=0.22)
+    fig.add_trace(go.Bar(x=["MMSE", "Hippocampus"], y=[mmse_mae, hippo_mae],
+                         marker=dict(color="#2f4f3f", line=dict(width=0)),
+                         text=[f"{mmse_mae:.2f}", f"{hippo_mae:.1f}"],
+                         textposition="outside", textfont=dict(size=11, color="#3c3c38"),
+                         showlegend=False), row=1, col=1)
+    fig.add_trace(go.Bar(x=["MMSE", "Hippocampus"], y=[mmse_r2, hippo_r2],
+                         marker=dict(color="#8fa396", line=dict(width=0)),
+                         text=[f"{mmse_r2:.3f}", f"{hippo_r2:.4f}"],
+                         textposition="outside", textfont=dict(size=11, color="#3c3c38"),
+                         showlegend=False), row=2, col=1)
+    axis_style = dict(showgrid=True, gridcolor="#e6e6e0", zeroline=False,
+                      linecolor="#e6e6e0", tickfont=dict(size=11))
+    for r in (1, 2):
+        fig.update_xaxes(axis_style, row=r, col=1)
+        fig.update_yaxes(axis_style, row=r, col=1)
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafaf7",
+                      font=dict(family="DM Sans, sans-serif", color="#3c3c38", size=12),
+                      margin=dict(l=44, r=28, t=72, b=36), height=360)
     return fig
 
 
 def classification_figure(data: dict | None) -> go.Figure | None:
-    if not data:
+    if not data or not all(k in data for k in ("clf3_cv_accuracy", "mci_conv_auc_cv")):
         return None
-    if not all(k in data for k in ("clf3_cv_accuracy", "mci_conv_auc_cv")):
-        return None
-    acc = float(data["clf3_cv_accuracy"])
-    auc = float(data["mci_conv_auc_cv"])
+    acc, auc = float(data["clf3_cv_accuracy"]), float(data["mci_conv_auc_cv"])
     acc_std = float(data.get("clf3_cv_accuracy_std", 0) or 0)
     auc_std = float(data.get("mci_conv_auc_cv_std", 0) or 0)
-
-    fig = go.Figure(
-        go.Bar(
-            x=["3-class accuracy (CV)", "MCI → Dementia AUC (CV)"],
-            y=[acc, auc],
-            error_y=dict(type="data", array=[acc_std, auc_std], color="#7a7a73", thickness=1.5, width=6),
-            marker=dict(color=["#2f4f3f", "#8fa396"], line=dict(width=0)),
-            text=[f"{acc:.3f} ± {acc_std:.3f}", f"{auc:.3f} ± {auc_std:.3f}"],
-            textposition="outside",
-            textfont=dict(size=11, color="#3c3c38"),
-        )
-    )
+    fig = go.Figure(go.Bar(
+        x=["3-class accuracy (CV)", "MCI → Dementia AUC (CV)"], y=[acc, auc],
+        error_y=dict(type="data", array=[acc_std, auc_std], color="#7a7a73", thickness=1.5, width=6),
+        marker=dict(color=["#2f4f3f", "#8fa396"], line=dict(width=0)),
+        text=[f"{acc:.3f} ± {acc_std:.3f}", f"{auc:.3f} ± {auc_std:.3f}"],
+        textposition="outside", textfont=dict(size=11, color="#3c3c38"),
+    ))
     fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#fafaf7",
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafaf7",
         font=dict(family="DM Sans, sans-serif", color="#3c3c38", size=12),
         xaxis=dict(showgrid=False, linecolor="#e6e6e0", tickfont=dict(size=11)),
-        yaxis=dict(gridcolor="#e6e6e0", zeroline=False, range=[0, 1.05], title=dict(text="Score", font=dict(size=11, color="#7a7a73"))),
-        margin=dict(l=48, r=28, t=28, b=72),
-        height=300,
+        yaxis=dict(gridcolor="#e6e6e0", zeroline=False, range=[0, 1.05],
+                   title=dict(text="Score", font=dict(size=11, color="#7a7a73"))),
+        margin=dict(l=48, r=28, t=28, b=72), height=300,
     )
     return fig
 
 
 def regression_metric_cards(data: dict | None) -> html.Div:
     if not data:
-        return html.Div(
-            className="metrics-grid",
-            children=[
-                html.Div(
-                    className="metric-card",
-                    children=[
-                        html.Span("Regression", className="metric-card__label"),
-                        html.Div("—", className="metric-card__value"),
-                        html.P(
-                            "Export lstm_metrics.json after LSTM training.",
-                            className="metric-card__hint",
-                        ),
-                    ],
-                )
-            ],
-        )
-
+        return html.Div(className="metrics-grid", children=[html.Div(
+            className="metric-card", children=[
+                html.Span("Regression", className="metric-card__label"),
+                html.Div("—", className="metric-card__value"),
+                html.P("Export lstm_metrics.json after LSTM training.", className="metric-card__hint"),
+            ])])
     specs = [
-        ("mmse_mae", "MMSE — mean absolute error", "{:.4f}", "Lower is better"),
-        ("mmse_r2", "MMSE — R²", "{:.4f}", "Variance explained"),
-        ("hippo_mae", "Hippocampus — MAE", "{:.2f}", "Lower is better"),
-        ("hippo_r2", "Hippocampus — R²", "{:.4f}", "Variance explained"),
+        ("mmse_mae",   "MMSE — mean absolute error", "{:.4f}", "Lower is better"),
+        ("mmse_r2",    "MMSE — R²",                  "{:.4f}", "Variance explained"),
+        ("hippo_mae",  "Hippocampus — MAE",           "{:.2f}", "Lower is better"),
+        ("hippo_r2",   "Hippocampus — R²",            "{:.4f}", "Variance explained"),
     ]
-    cards = []
-    for key, label, fmt, hint in specs:
-        if key not in data:
-            continue
-        val = float(data[key])
-        cards.append(
-            html.Div(
-                className="metric-card",
-                children=[
-                    html.Span(label, className="metric-card__label"),
-                    html.Div(fmt.format(val), className="metric-card__value"),
-                    html.P(hint, className="metric-card__hint"),
-                ],
-            )
-        )
-    if not cards:
-        return regression_metric_cards(None)
-    return html.Div(className="metrics-grid", children=cards)
+    cards = [html.Div(className="metric-card", children=[
+                html.Span(label, className="metric-card__label"),
+                html.Div(fmt.format(float(data[key])), className="metric-card__value"),
+                html.P(hint, className="metric-card__hint"),
+             ]) for key, label, fmt, hint in specs if key in data]
+    return html.Div(className="metrics-grid", children=cards or regression_metric_cards(None).children)
 
 
 def classification_metric_cards(data: dict | None) -> html.Div | None:
     if not data or "clf3_cv_accuracy" not in data:
         return None
-    acc = float(data["clf3_cv_accuracy"])
-    acc_std = float(data.get("clf3_cv_accuracy_std", 0) or 0)
-    items: list[tuple[str, str, str]] = [
-        ("3-class accuracy (CV)", f"{acc:.4f} ± {acc_std:.4f}", "Stratified CV, XGBoost"),
-    ]
+    acc, acc_std = float(data["clf3_cv_accuracy"]), float(data.get("clf3_cv_accuracy_std", 0) or 0)
+    items = [("3-class accuracy (CV)", f"{acc:.4f} ± {acc_std:.4f}", "Stratified CV, XGBoost")]
     if "mci_conv_auc_cv" in data:
         auc = float(data["mci_conv_auc_cv"])
         auc_std = float(data.get("mci_conv_auc_cv_std", 0) or 0)
         items.append(("MCI → Dementia AUC (CV)", f"{auc:.4f} ± {auc_std:.4f}", "Conversion risk ranking"))
-    return html.Div(
-        className="metrics-grid",
-        children=[
-            html.Div(
-                className="metric-card",
-                children=[
-                    html.Span(label, className="metric-card__label"),
-                    html.Div(val, className="metric-card__value"),
-                    html.P(hint, className="metric-card__hint"),
-                ],
-            )
-            for label, val, hint in items
-        ],
-    )
+    return html.Div(className="metrics-grid", children=[
+        html.Div(className="metric-card", children=[
+            html.Span(label, className="metric-card__label"),
+            html.Div(val, className="metric-card__value"),
+            html.P(hint, className="metric-card__hint"),
+        ]) for label, val, hint in items])
 
 
 def simulation_metric_cards(sim: dict | None) -> html.Div | None:
     if not sim:
         return None
-    mapping: list[tuple[str, str, str, str]] = [
-        ("base_patient", "Base patient RID", "{}", "Anchor record for twin runs"),
-        ("n_future_visits", "Future visits simulated", "{}", "Horizon length"),
-        ("mc_samples", "Monte Carlo samples", "{}", "Draws for uncertainty"),
-        ("mc_ci90_width_last", "90% CI width (last visit)", "{:.2f}", "MMSE points, approximate"),
-        ("apoe4_mmse_spread", "APOE4 MMSE spread", "{:.2f}", "Exploratory what-if delta"),
-        ("intervention_40pct_benefit", "40% intervention benefit", "{:.2f}", "MMSE change vs baseline path"),
+    mapping = [
+        ("base_patient",            "Base patient RID",             "{}",    "Anchor record for twin runs"),
+        ("n_future_visits",         "Future visits simulated",      "{}",    "Horizon length"),
+        ("mc_samples",              "Monte Carlo samples",          "{}",    "Draws for uncertainty"),
+        ("mc_ci90_width_last",      "90% CI width (last visit)",    "{:.2f}","MMSE points, approximate"),
+        ("apoe4_mmse_spread",       "APOE4 MMSE spread",            "{:.2f}","Exploratory what-if delta"),
+        ("intervention_40pct_benefit","40% intervention benefit",   "{:.2f}","MMSE change vs baseline path"),
     ]
     cards = []
     for key, label, fmt, hint in mapping:
         if key not in sim:
             continue
         raw = sim[key]
-        if isinstance(raw, float):
-            val = fmt.format(raw)
-        else:
-            val = str(raw)
-        cards.append(
-            html.Div(
-                className="metric-card",
-                children=[
-                    html.Span(label, className="metric-card__label"),
-                    html.Div(val, className="metric-card__value"),
-                    html.P(hint, className="metric-card__hint"),
-                ],
-            )
-        )
-    if not cards:
-        return None
-    return html.Div(className="metrics-grid", children=cards)
+        val = fmt.format(float(raw)) if isinstance(raw, float) else str(raw)
+        cards.append(html.Div(className="metric-card", children=[
+            html.Span(label, className="metric-card__label"),
+            html.Div(val, className="metric-card__value"),
+            html.P(hint, className="metric-card__hint"),
+        ]))
+    return html.Div(className="metrics-grid", children=cards) if cards else None
 
 
+# ── Gallery ───────────────────────────────────────────────────────────────────
 def figure_gallery_rows(groups: list[tuple[str, list[tuple[str, str]]]]) -> list:
-    """Build figure elements; skip missing files."""
+    """Build clickable figure cards; skip missing files."""
     rows: list = []
     for group_title, entries in groups:
         present = [(rel, cap) for rel, cap in entries if (RESULTS_ROOT / rel).is_file()]
         if not present:
             continue
         rows.append(html.H3(group_title, className="metrics-block__title"))
-        rows.append(
-            html.Div(
-                className="gallery-grid",
-                children=[
-                    html.Figure(
-                        className="figure-card",
-                        children=[
-                            html.Img(src=hub_asset_url(rel), alt=cap),
-                            html.Figcaption(cap),
-                        ],
-                    )
-                    for rel, cap in present
-                ],
-            )
-        )
+        rows.append(html.Div(
+            className="gallery-grid",
+            children=[
+                html.Figure(
+                    className="figure-card",
+                    children=[
+                        html.Img(src=hub_asset_url(rel), alt=cap),
+                        html.Figcaption(_gallery_title(rel, cap)),
+                    ],
+                )
+                for rel, cap in present
+            ],
+        ))
     return rows
 
 
+# ── Demo twin helpers ─────────────────────────────────────────────────────────
 def _demo_patient(demo: dict, rid: str) -> dict | None:
     if not demo or "patients" not in demo:
         return None
@@ -396,25 +591,17 @@ def _demo_patient(demo: dict, rid: str) -> dict | None:
 
 def _plotly_layout_base(title: str, yaxis_title: str, height: int = 400) -> dict:
     return dict(
-        title=dict(text=title, font=dict(family="Fraunces, Georgia, serif", size=16, color="#121211"), x=0, xanchor="left"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#fafaf7",
+        title=dict(text=title, font=dict(family="Fraunces, Georgia, serif", size=16,
+                                          color="#121211"), x=0, xanchor="left"),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafaf7",
         font=dict(family="DM Sans, sans-serif", size=12, color="#3c3c38"),
-        margin=dict(l=52, r=28, t=72, b=52),
-        height=height,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
-        xaxis=dict(
-            title=dict(text="Visit number", font=dict(size=11, color="#7a7a73")),
-            gridcolor="#e6e6e0",
-            zeroline=False,
-            linecolor="#e6e6e0",
-        ),
-        yaxis=dict(
-            title=dict(text=yaxis_title, font=dict(size=11, color="#7a7a73")),
-            gridcolor="#e6e6e0",
-            zeroline=False,
-            linecolor="#e6e6e0",
-        ),
+        margin=dict(l=52, r=28, t=72, b=52), height=height,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right",
+                    x=1, bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(title=dict(text="Visit number", font=dict(size=11, color="#7a7a73")),
+                   gridcolor="#e6e6e0", zeroline=False, linecolor="#e6e6e0"),
+        yaxis=dict(title=dict(text=yaxis_title, font=dict(size=11, color="#7a7a73")),
+                   gridcolor="#e6e6e0", zeroline=False, linecolor="#e6e6e0"),
         hovermode="x unified",
     )
 
@@ -423,98 +610,61 @@ def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
     fig = go.Figure()
     if not demo:
         fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
-        fig.add_annotation(text="Add results/metrics/demo_data.json", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
+        fig.add_annotation(text="Add results/metrics/demo_data.json", xref="paper",
+                           yref="paper", x=0.5, y=0.5, showarrow=False,
+                           font=dict(color="#7a7a73", size=14))
+        fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
     p = _demo_patient(demo, rid)
     if not p:
         fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
-        fig.add_annotation(text="Patient not found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
+        fig.add_annotation(text="Patient not found", xref="paper", yref="paper",
+                           x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
+        fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
-
     v_obs, m_obs = p["visits_obs"], p["mmse_obs"]
     v_roll = [v_obs[-1]] + p["pred_visits"]
     m_roll = [m_obs[-1]] + p["mmse_pred"]
-
-    fig.add_trace(
-        go.Scatter(
-            x=v_obs,
-            y=m_obs,
-            mode="lines+markers",
-            name="Observed (ADNI)",
-            line=dict(color="#2f4f3f", width=2.8),
-            marker=dict(size=9, color="#2f4f3f"),
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=v_roll,
-            y=m_roll,
-            mode="lines+markers",
-            name="Predicted (LSTM)",
-            line=dict(color="#8fa396", width=2.2, dash="dash"),
-            marker=dict(size=8, symbol="square", color="#8fa396"),
-        )
-    )
+    fig.add_trace(go.Scatter(x=v_obs, y=m_obs, mode="lines+markers", name="Observed (ADNI)",
+                             line=dict(color="#2f4f3f", width=2.8),
+                             marker=dict(size=9, color="#2f4f3f")))
+    fig.add_trace(go.Scatter(x=v_roll, y=m_roll, mode="lines+markers", name="Predicted (LSTM)",
+                             line=dict(color="#8fa396", width=2.2, dash="dash"),
+                             marker=dict(size=8, symbol="square", color="#8fa396")))
     fig.add_hline(y=24, line_dash="dot", line_color="#c4c4bd", opacity=0.9)
-    fig.add_annotation(
-        xref="paper",
-        yref="y",
-        x=0.01,
-        y=24.6,
-        text="MCI threshold (24)",
-        showarrow=False,
-        font=dict(size=10, color="#7a7a73"),
-        xanchor="left",
-    )
+    fig.add_annotation(xref="paper", yref="y", x=0.01, y=24.6, text="MCI threshold (24)",
+                       showarrow=False, font=dict(size=10, color="#7a7a73"), xanchor="left")
     fig.update_layout(**_plotly_layout_base(f"MMSE — RID {p['rid']}", "MMSE score"))
     fig.update_yaxes(range=[0, 32])
     return fig
 
 
 def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
+    import math as _math
     fig = go.Figure()
     if not demo:
         fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
+        fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
     p = _demo_patient(demo, rid)
     if not p:
         fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
+        fig.update_xaxes(visible=False); fig.update_yaxes(visible=False)
         return fig
-
     v_obs, h_obs = p["visits_obs"], p["hippo_obs"]
-    v_roll = [v_obs[-1]] + p["pred_visits"]
-    h_roll = [h_obs[-1]] + p["hippo_pred"]
-
-    fig.add_trace(
-        go.Scatter(
-            x=v_obs,
-            y=h_obs,
-            mode="lines+markers",
-            name="Observed (ADNI)",
-            line=dict(color="#2f4f3f", width=2.8),
-            marker=dict(size=9, color="#2f4f3f"),
-            connectgaps=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=v_roll,
-            y=h_roll,
-            mode="lines+markers",
-            name="Predicted (LSTM)",
-            line=dict(color="#8fa396", width=2.2, dash="dash"),
-            marker=dict(size=8, symbol="square", color="#8fa396"),
-            connectgaps=False,
-        )
-    )
+    fig.add_trace(go.Scatter(x=v_obs, y=h_obs, mode="lines+markers", name="Observed (ADNI)",
+                             line=dict(color="#2f4f3f", width=2.8),
+                             marker=dict(size=9, color="#2f4f3f"), connectgaps=False))
+    hp = p.get("hippo_pred", [])
+    pv = p.get("pred_visits", [])
+    if hp and pv and not all(_math.isnan(h) if isinstance(h, float) else False for h in hp):
+        v_roll = [v_obs[-1]] + list(pv)
+        h_roll = [h_obs[-1]] + list(hp)
+        fig.add_trace(go.Scatter(x=v_roll, y=h_roll, mode="lines+markers",
+                                 name="Predicted (LSTM)",
+                                 line=dict(color="#8fa396", width=2.2, dash="dash"),
+                                 marker=dict(size=8, symbol="square", color="#8fa396"),
+                                 connectgaps=False))
     fig.update_layout(**_plotly_layout_base(f"Hippocampus — RID {p['rid']}", "Hippocampus volume (mm³)"))
     return fig
 
@@ -527,13 +677,12 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
         return [html.P("Patient not found.", className="demo-meta__empty")]
     method = demo.get("prediction_method", "unknown")
     method_label = {
-        "notebook_02_export": "LSTM predictions bundled with `02_lstm_model.ipynb` → demo_data.json",
+        "notebook_02_export": "LSTM predictions bundled with 02_lstm_model.ipynb → demo_data.json",
         "lstm_rollout": "LSTM autoregressive rollout",
         "linear_extrapolation": "Linear extrapolation",
     }.get(method, method.replace("_", " "))
     items = [
-        ("RID", str(p["rid"])),
-        ("APOEε4 alleles", str(p["apoe4"])),
+        ("RID", str(p["rid"])), ("APOEε4 alleles", str(p["apoe4"])),
         ("Last observed diagnosis", str(p.get("dx_last", "—"))),
         ("Observed visits", str(p.get("n_obs_visits", "—"))),
         ("Future steps in JSON", str(len(p.get("pred_visits", [])))),
@@ -546,469 +695,304 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
     return [html.Dl(className="demo-meta__dl", children=dl_children)]
 
 
+# ── Demo simulation section ───────────────────────────────────────────────────
 def build_demo_simulation_section() -> html.Section:
     if DEMO_SIM and DEMO_SIM.get("patients"):
         rids = [str(r) for r in DEMO_SIM.get("demo_rids", [])]
         first = rids[0] if rids else None
         patients = DEMO_SIM["patients"]
-        options = []
-        for r in rids:
-            pr = patients.get(r, {})
-            dx = str(pr.get("dx_last", "—"))
-            ap = pr.get("apoe4", "—")
-            options.append({"label": f"RID {r}  ·  {dx}  ·  APOEε4 = {ap}", "value": r})
-        return html.Section(
-            id="demo-simulation",
-            className="section",
-            children=[
-                html.Div(
-                    className="section__inner",
-                    children=[
-                        html.P("Interactive", className="section__label"),
-                        html.H2("Demo patient simulation.", className="section__title"),
-                        html.P(
-                            "Five demo subjects from `results/metrics/demo_data.json`, produced when you run "
-                            "`02_lstm_model.ipynb` (observed prefix + LSTM one-step forecasts on held-out visit indices).",
-                            className="section__lead",
-                        ),
-                        html.Div(
-                            className="demo-toolbar",
-                            children=[
-                                html.Label("Patient", className="demo-toolbar__label", htmlFor="demo-patient-select"),
-                                dcc.Dropdown(
-                                    id="demo-patient-select",
-                                    options=options,
-                                    value=first,
-                                    clearable=False,
-                                    className="demo-dropdown",
-                                    style={"maxWidth": "28rem", "fontSize": "0.9375rem"},
-                                ),
-                            ],
-                        ),
-                        html.Div(id="demo-patient-meta", className="demo-meta", children=demo_meta_children(first or "", DEMO_SIM)),
-                        html.Div(
-                            className="demo-charts",
-                            children=[
-                                html.Div(
-                                    className="chart-wrap chart-wrap--demo",
-                                    children=[
-                                        dcc.Graph(
-                                            id="demo-graph-mmse",
-                                            figure=demo_mmse_figure(first or "", DEMO_SIM),
-                                            config=dict(displayModeBar=False),
-                                            style={"height": "420px"},
-                                        )
-                                    ],
-                                ),
-                                html.Div(
-                                    className="chart-wrap chart-wrap--demo",
-                                    children=[
-                                        dcc.Graph(
-                                            id="demo-graph-hippo",
-                                            figure=demo_hippo_figure(first or "", DEMO_SIM),
-                                            config=dict(displayModeBar=False),
-                                            style={"height": "420px"},
-                                        )
-                                    ],
-                                ),
-                            ],
-                        ),
-                    ],
-                )
-            ],
-        )
+        options = [{"label": f"RID {r}  ·  {patients.get(r, {}).get('dx_last','—')}  ·  "
+                             f"APOEε4 = {patients.get(r, {}).get('apoe4','—')}", "value": r}
+                   for r in rids]
+        return html.Section(id="demo-simulation", className="section", children=[
+            html.Div(className="section__inner", children=[
+                html.P("Interactive", className="section__label"),
+                html.H2("Demo patient simulation.", className="section__title"),
+                html.P("Five demo subjects from results/metrics/demo_data.json, produced when "
+                       "you run 02_lstm_model.ipynb (observed prefix + LSTM one-step forecasts "
+                       "on held-out visit indices).", className="section__lead"),
+                html.Div(className="demo-toolbar", children=[
+                    html.Label("Patient", className="demo-toolbar__label",
+                               htmlFor="demo-patient-select"),
+                    dcc.Dropdown(id="demo-patient-select", options=options, value=first,
+                                 clearable=False, className="demo-dropdown",
+                                 style={"maxWidth": "28rem", "fontSize": "0.9375rem"}),
+                ]),
+                html.Div(id="demo-patient-meta", className="demo-meta",
+                         children=demo_meta_children(first or "", DEMO_SIM)),
+                html.Div(className="demo-charts", children=[
+                    html.Div(className="chart-wrap chart-wrap--demo", children=[
+                        dcc.Graph(id="demo-graph-mmse",
+                                  figure=demo_mmse_figure(first or "", DEMO_SIM),
+                                  config=dict(displayModeBar=False), style={"height": "420px"})]),
+                    html.Div(className="chart-wrap chart-wrap--demo", children=[
+                        dcc.Graph(id="demo-graph-hippo",
+                                  figure=demo_hippo_figure(first or "", DEMO_SIM),
+                                  config=dict(displayModeBar=False), style={"height": "420px"})]),
+                ]),
+            ])])
+    return html.Section(id="demo-simulation", className="section", children=[
+        html.Div(className="section__inner", children=[
+            html.P("Interactive", className="section__label"),
+            html.H2("Demo patient simulation.", className="section__title"),
+            html.P("Run 02_lstm_model.ipynb to write results/metrics/demo_data.json, "
+                   "then reload this page.", className="section__lead"),
+        ])])
 
-    return html.Section(
-        id="demo-simulation",
-        className="section",
+
+# ── Lightbox modal (manipulated by JS, not Dash callbacks) ────────────────────
+def build_lightbox() -> html.Div:
+    return html.Div(
+        id="lightbox-overlay",
+        className="lb-overlay",
         children=[
-            html.Div(
-                className="section__inner",
-                children=[
-                    html.P("Interactive", className="section__label"),
-                    html.H2("Demo patient simulation.", className="section__title"),
-                    html.P(
-                        "Run `02_lstm_model.ipynb` to write `results/metrics/demo_data.json`, then reload this page.",
-                        className="section__lead",
-                    ),
-                ],
-            )
+            html.Div(className="lb-card", children=[
+                # ── Left pane: full image ──────────────────────────────────
+                html.Div(className="lb-img-pane", children=[
+                    html.Img(id="lb-main-img", src="", alt=""),
+                ]),
+                # ── Right pane: title + explanation ───────────────────────
+                html.Div(className="lb-info-pane", children=[
+                    html.Button("×", className="lb-close", title="Close (Esc)"),
+                    html.P("Figure Analysis", className="lb-label"),
+                    html.H2("", id="lb-title", className="lb-title"),
+                    html.Div(className="lb-divider"),
+                    html.Div(id="lb-explanation", className="lb-explanation"),
+                    html.Div(className="lb-footer",
+                             children=html.P("Scroll for more ↓", className="lb-scroll-hint")),
+                ]),
+            ])
         ],
     )
 
 
+# ── Main layout ───────────────────────────────────────────────────────────────
 def build_layout() -> html.Div:
     metrics = load_metrics()
     simulation = load_simulation_summary()
     clf_fig = classification_figure(metrics)
 
-    gallery_children = figure_gallery_rows(
-        [
-            ("Trajectory & policy figures", GALLERY_VISUALS),
-            ("Model diagnostics", GALLERY_METRICS_PNG),
-        ]
-    )
+    gallery_children = figure_gallery_rows([
+        ("Trajectory & policy figures", GALLERY_VISUALS),
+        ("Model diagnostics",           GALLERY_METRICS_PNG),
+    ])
 
     metrics_children: list = [
         html.P("Evidence", className="section__label"),
         html.H2("Exported metrics & charts.", className="section__title"),
-        html.P(
-            "Regression and classification values are read from results/metrics/lstm_metrics.json. "
-            "Simulation summaries use simulation_summary.json when present.",
-            className="section__lead",
-        ),
-        html.Div(
-            className="metrics-block",
-            children=[
-                html.H3("Regression (LSTM)", className="metrics-block__title"),
-                html.P("MMSE and hippocampal volume heads.", className="metrics-block__lead"),
-                regression_metric_cards(metrics),
-                html.Div(
-                    className="chart-wrap",
-                    children=[
-                        dcc.Graph(
-                            id="metrics-chart",
-                            figure=metrics_figure(metrics),
-                            config=dict(displayModeBar=False),
-                            style={"height": "380px"},
-                        )
-                    ],
-                ),
-            ],
-        ),
+        html.P("Regression and classification values are read from "
+               "results/metrics/lstm_metrics.json. "
+               "Simulation summaries use simulation_summary.json when present.",
+               className="section__lead"),
+        html.Div(className="metrics-block", children=[
+            html.H3("Regression (LSTM)", className="metrics-block__title"),
+            html.P("MMSE and hippocampal volume heads.", className="metrics-block__lead"),
+            regression_metric_cards(metrics),
+            html.Div(className="chart-wrap", children=[
+                dcc.Graph(id="metrics-chart", figure=metrics_figure(metrics),
+                          config=dict(displayModeBar=False), style={"height": "380px"})]),
+        ]),
     ]
 
     clf_cards = classification_metric_cards(metrics)
     if clf_cards:
         clf_block: list = [
             html.H3("Classification (XGBoost)", className="metrics-block__title"),
-            html.P(
-                "Three-class diagnosis and MCI-to-dementia conversion signals from the patient-level pipeline.",
-                className="metrics-block__lead",
-            ),
+            html.P("Three-class diagnosis and MCI-to-dementia conversion signals from "
+                   "the patient-level pipeline.", className="metrics-block__lead"),
             clf_cards,
         ]
         if clf_fig:
-            clf_block.append(
-                html.Div(
-                    className="chart-wrap",
-                    children=[
-                        dcc.Graph(
-                            id="clf-chart",
-                            figure=clf_fig,
-                            config=dict(displayModeBar=False),
-                            style={"height": "320px"},
-                        )
-                    ],
-                )
-            )
+            clf_block.append(html.Div(className="chart-wrap", children=[
+                dcc.Graph(id="clf-chart", figure=clf_fig,
+                          config=dict(displayModeBar=False), style={"height": "320px"})]))
         metrics_children.append(html.Div(className="metrics-block", children=clf_block))
 
     sim_cards = simulation_metric_cards(simulation)
     if sim_cards:
-        metrics_children.append(
-            html.Div(
-                className="metrics-block",
-                children=[
-                    html.H3("Simulation snapshot", className="metrics-block__title"),
+        metrics_children.append(html.Div(className="metrics-block", children=[
+            html.H3("Simulation snapshot", className="metrics-block__title"),
+            html.P("Monte Carlo-style summaries exported with the simulation notebook.",
+                   className="metrics-block__lead"),
+            sim_cards,
+        ]))
+
+    # Team byline text
+    team_str = "  ·  ".join(TEAM_MEMBERS)
+
+    return html.Div(className="shell", children=[
+        # ── Nav ───────────────────────────────────────────────────────────
+        html.Nav(className="site-nav", children=[
+            html.Div(className="site-nav__inner", children=[
+                html.A("Digital Twin", href="#top", className="site-nav__brand"),
+                html.Ul(className="site-nav__links", children=[
+                    html.Li(html.A("About",      href="#about")),
+                    html.Li(html.A("Pipeline",   href="#pipeline")),
+                    html.Li(html.A("Metrics",    href="#metrics")),
+                    html.Li(html.A("Demo twin",  href="#demo-simulation")),
+                    html.Li(html.A("Gallery",    href="#gallery")),
+                    html.Li(html.A("Notebooks",  href="#notebooks")),
+                ]),
+            ])
+        ]),
+
+        html.Main(children=[
+            # ── Hero ──────────────────────────────────────────────────────
+            html.Section(id="top", className="hero", children=[
+                html.Div(className="hero__inner", children=[
+                    html.P("Research prototype", className="hero__eyebrow"),
+                    html.H1("Alzheimer's digital twin", className="hero__title"),
                     html.P(
-                        "Monte Carlo-style summaries exported with the simulation notebook.",
-                        className="metrics-block__lead",
+                        "Longitudinal ADNI signals, sequence models, classification, "
+                        "visual analytics, and simulation — presented with room to breathe.",
+                        className="hero__subtitle",
                     ),
-                    sim_cards,
-                ],
-            )
-        )
+                    html.Div(className="hero__rule"),
+                    # Team byline
+                    html.P(className="hero__byline", children=[
+                        html.Span("By  ", className="hero__byline-label"),
+                        team_str,
+                    ]),
+                ])
+            ]),
 
-    return html.Div(
-        className="shell",
-        children=[
-            html.Nav(
-                className="site-nav",
-                children=[
-                    html.Div(
-                        className="site-nav__inner",
-                        children=[
-                            html.A("Digital Twin", href="#top", className="site-nav__brand"),
-                            html.Ul(
-                                className="site-nav__links",
-                                children=[
-                                    html.Li(html.A("About", href="#about")),
-                                    html.Li(html.A("Pipeline", href="#pipeline")),
-                                    html.Li(html.A("Metrics", href="#metrics")),
-                                    html.Li(html.A("Demo twin", href="#demo-simulation")),
-                                    html.Li(html.A("Gallery", href="#gallery")),
-                                    html.Li(html.A("Notebooks", href="#notebooks")),
-                                ],
-                            ),
-                        ],
-                    )
-                ],
-            ),
-            html.Main(
-                children=[
-                    html.Section(
-                        id="top",
-                        className="hero",
-                        children=[
-                            html.Div(
-                                className="hero__inner",
-                                children=[
-                                    html.P("Research prototype", className="hero__eyebrow"),
-                                    html.H1(
-                                        "Alzheimer's digital twin",
-                                        className="hero__title",
-                                    ),
-                                    html.P(
-                                        "Longitudinal ADNI signals, sequence models, classification, "
-                                        "visual analytics, and simulation—presented with room to breathe.",
-                                        className="hero__subtitle",
-                                    ),
-                                    html.Div(className="hero__rule"),
-                                ],
-                            )
-                        ],
-                    ),
-                    html.Section(
-                        id="about",
-                        className="section section--tight-top",
-                        children=[
-                            html.Div(
-                                className="section__inner",
-                                children=[
-                                    html.P("Context", className="section__label"),
-                                    html.H2("Clinical trajectories, modelled with restraint.", className="section__title"),
-                                    html.Div(
-                                        className="grid-2",
-                                        children=[
-                                            html.Div(
-                                                className="prose",
-                                                children=[
-                                                    html.P(
-                                                        "This repository explores a digital twin framing for Alzheimer's "
-                                                        "disease progression: structured visits, cognitive scores, imaging-derived "
-                                                        "volume, and genetics—aligned in time where possible."
-                                                    ),
-                                                    html.P(
-                                                        "Recent work adds patient-level classification (three-class diagnosis and "
-                                                        "MCI-to-dementia conversion), a visualization dashboard, and Monte Carlo–style "
-                                                        "simulation exports alongside the original LSTM regression path."
-                                                    ),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="prose",
-                                                children=[
-                                                    html.P(
-                                                        "Data centre on ADNIMERGE-style tables. The LSTM stack uses aligned "
-                                                        "feature sequences; XGBoost models consume engineered patient snapshots; "
-                                                        "figures and JSON summaries land under results/ for this hub to surface."
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            )
-                        ],
-                    ),
-                    html.Section(
-                        id="pipeline",
-                        className="section",
-                        children=[
-                            html.Div(
-                                className="section__inner",
-                                children=[
-                                    html.P("Flow", className="section__label"),
-                                    html.H2("From cohort to twin scenarios.", className="section__title"),
-                                    html.P(
-                                        "Five beats that mirror the notebooks—kept visually light.",
-                                        className="section__lead",
-                                    ),
-                                    html.Div(
-                                        className="pipeline",
-                                        children=[
-                                            html.Div(
-                                                className="pipeline__step",
-                                                children=[
-                                                    html.Div("01", className="pipeline__num"),
-                                                    html.H3("Curate"),
-                                                    html.P(
-                                                        "Load and filter longitudinal rows; harmonise diagnosis codes; "
-                                                        "document missingness."
-                                                    ),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="pipeline__step",
-                                                children=[
-                                                    html.Div("02", className="pipeline__num"),
-                                                    html.H3("Encode"),
-                                                    html.P(
-                                                        "Sequence windows for the LSTM with scaled features matching the "
-                                                        "trained checkpoint."
-                                                    ),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="pipeline__step",
-                                                children=[
-                                                    html.Div("03", className="pipeline__num"),
-                                                    html.H3("Classify"),
-                                                    html.P(
-                                                        "XGBoost pipelines for three-class diagnosis and MCI→Dementia conversion, "
-                                                        "with CV metrics exported to JSON."
-                                                    ),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="pipeline__step",
-                                                children=[
-                                                    html.Div("04", className="pipeline__num"),
-                                                    html.H3("Visualize"),
-                                                    html.P(
-                                                        "Trajectory plots, subgroup views, SHAP, ROC, and consolidated dashboards "
-                                                        "written to results/visualizations and results/metrics."
-                                                    ),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="pipeline__step",
-                                                children=[
-                                                    html.Div("05", className="pipeline__num"),
-                                                    html.H3("Simulate"),
-                                                    html.P(
-                                                        "What-if and Monte Carlo summaries—patient anchors, intervention deltas, "
-                                                        "and uncertainty bands—exported for review."
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            )
-                        ],
-                    ),
-                    html.Section(id="metrics", className="section", children=[html.Div(className="section__inner", children=metrics_children)]),
-                    build_demo_simulation_section(),
-                    html.Section(
-                        id="gallery",
-                        className="section",
-                        children=[
-                            html.Div(
-                                className="section__inner",
-                                children=[
-                                    html.P("Figures", className="section__label"),
-                                    html.H2("Static outputs from the analysis stack.", className="section__title"),
-                                    html.P(
-                                        "PNG exports produced by the visualization and classification notebooks. "
-                                        "Missing files are omitted automatically.",
-                                        className="section__lead",
-                                    ),
-                                    *(
-                                        gallery_children
-                                        if gallery_children
-                                        else [
-                                            html.P(
-                                                "No figure files found under results/. Run the visualization notebook to populate this gallery.",
-                                                className="section__lead",
-                                            )
-                                        ]
-                                    ),
-                                ],
-                            )
-                        ],
-                    ),
-                    html.Section(
-                        id="notebooks",
-                        className="section",
-                        children=[
-                            html.Div(
-                                className="section__inner",
-                                children=[
-                                    html.P("Workspace", className="section__label"),
-                                    html.H2("Notebooks & artefacts.", className="section__title"),
-                                    html.P(
-                                        "Open these in JupyterLab from the repository root after installing requirements.",
-                                        className="section__lead",
-                                    ),
-                                    html.Div(
-                                        className="notebook-list",
-                                        children=[
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("data_exploration.ipynb", className="notebook-row__name"),
-                                                    html.Span("Cohort profile & features", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("02_lstm_model.ipynb", className="notebook-row__name"),
-                                                    html.Span("LSTM training & regression metrics", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("03_classification.ipynb", className="notebook-row__name"),
-                                                    html.Span("XGBoost diagnosis & conversion", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("04_visualization.ipynb", className="notebook-row__name"),
-                                                    html.Span("Dashboards, trajectories, SHAP / ROC", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("05_simulation.ipynb", className="notebook-row__name"),
-                                                    html.Span("What-if & Monte Carlo summaries", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("results/metrics/demo_data.json", className="notebook-row__name"),
-                                                    html.Span("Demo patients for LSTM + hub (written by 02_lstm_model)", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("data/raw/ADNIMERGE.csv", className="notebook-row__name"),
-                                                    html.Span("Source table (local only)", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            )
-                        ],
-                    ),
-                ],
-            ),
-            html.Footer(
-                className="site-footer",
-                children=[
+            # ── About ─────────────────────────────────────────────────────
+            html.Section(id="about", className="section section--tight-top", children=[
+                html.Div(className="section__inner", children=[
+                    html.P("Context", className="section__label"),
+                    html.H2("Clinical trajectories, modelled with restraint.", className="section__title"),
+                    html.Div(className="grid-2", children=[
+                        html.Div(className="prose", children=[
+                            html.P("This repository explores a digital twin framing for Alzheimer's "
+                                   "disease progression: structured visits, cognitive scores, imaging-derived "
+                                   "volume, and genetics — aligned in time where possible."),
+                            html.P("Recent work adds patient-level classification (three-class diagnosis and "
+                                   "MCI-to-dementia conversion), a visualization dashboard, and Monte Carlo–style "
+                                   "simulation exports alongside the original LSTM regression path."),
+                        ]),
+                        html.Div(className="prose", children=[
+                            html.P("Data centre on ADNIMERGE-style tables. The LSTM stack uses aligned "
+                                   "feature sequences; XGBoost models consume engineered patient snapshots; "
+                                   "figures and JSON summaries land under results/ for this hub to surface."),
+                        ]),
+                    ]),
+                ])
+            ]),
+
+            # ── Pipeline ──────────────────────────────────────────────────
+            html.Section(id="pipeline", className="section", children=[
+                html.Div(className="section__inner", children=[
+                    html.P("Flow", className="section__label"),
+                    html.H2("From cohort to twin scenarios.", className="section__title"),
+                    html.P("Five beats that mirror the notebooks — kept visually light.",
+                           className="section__lead"),
+                    html.Div(className="pipeline", children=[
+                        html.Div(className="pipeline__step", children=[
+                            html.Div("01", className="pipeline__num"), html.H3("Curate"),
+                            html.P("Load and filter longitudinal rows; harmonise diagnosis codes; "
+                                   "document missingness."),
+                        ]),
+                        html.Div(className="pipeline__step", children=[
+                            html.Div("02", className="pipeline__num"), html.H3("Encode"),
+                            html.P("Sequence windows for the LSTM with scaled features matching "
+                                   "the trained checkpoint."),
+                        ]),
+                        html.Div(className="pipeline__step", children=[
+                            html.Div("03", className="pipeline__num"), html.H3("Classify"),
+                            html.P("XGBoost pipelines for three-class diagnosis and MCI→Dementia "
+                                   "conversion, with CV metrics exported to JSON."),
+                        ]),
+                        html.Div(className="pipeline__step", children=[
+                            html.Div("04", className="pipeline__num"), html.H3("Visualize"),
+                            html.P("Trajectory plots, subgroup views, SHAP, ROC, and consolidated "
+                                   "dashboards written to results/visualizations and results/metrics."),
+                        ]),
+                        html.Div(className="pipeline__step", children=[
+                            html.Div("05", className="pipeline__num"), html.H3("Simulate"),
+                            html.P("What-if and Monte Carlo summaries — patient anchors, intervention "
+                                   "deltas, and uncertainty bands — exported for review."),
+                        ]),
+                    ]),
+                ])
+            ]),
+
+            # ── Metrics ───────────────────────────────────────────────────
+            html.Section(id="metrics", className="section", children=[
+                html.Div(className="section__inner", children=metrics_children)]),
+
+            # ── Demo twin ─────────────────────────────────────────────────
+            build_demo_simulation_section(),
+
+            # ── Gallery ───────────────────────────────────────────────────
+            html.Section(id="gallery", className="section", children=[
+                html.Div(className="section__inner", children=[
+                    html.P("Figures", className="section__label"),
+                    html.H2("Static outputs from the analysis stack.", className="section__title"),
                     html.P(
-                        "Alzheimer's digital twin — exploratory research software. Not a medical device."
-                    )
-                ],
-            ),
-        ],
-    )
+                        "Click any image to open a full-screen view with an explanation of "
+                        "what it shows and why it matters.",
+                        className="section__lead",
+                    ),
+                    *(gallery_children if gallery_children else [
+                        html.P("No figure files found under results/. Run the visualization "
+                               "notebook to populate this gallery.", className="section__lead")
+                    ]),
+                ])
+            ]),
+
+            # ── Notebooks ─────────────────────────────────────────────────
+            html.Section(id="notebooks", className="section", children=[
+                html.Div(className="section__inner", children=[
+                    html.P("Workspace", className="section__label"),
+                    html.H2("Notebooks & artefacts.", className="section__title"),
+                    html.P("Open these in JupyterLab from the repository root after installing requirements.",
+                           className="section__lead"),
+                    html.Div(className="notebook-list", children=[
+                        html.Div(className="notebook-row", children=[
+                            html.Span("data_exploration.ipynb",    className="notebook-row__name"),
+                            html.Span("Cohort profile & features", className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("02_lstm_model.ipynb",               className="notebook-row__name"),
+                            html.Span("LSTM training & regression metrics",className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("03_classification.ipynb",         className="notebook-row__name"),
+                            html.Span("XGBoost diagnosis & conversion",  className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("04_visualization.ipynb",             className="notebook-row__name"),
+                            html.Span("Dashboards, trajectories, SHAP / ROC",className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("05_simulation.ipynb",           className="notebook-row__name"),
+                            html.Span("What-if & Monte Carlo summaries",className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("results/metrics/demo_data.json",                  className="notebook-row__name"),
+                            html.Span("Demo patients for LSTM + hub (written by 02_lstm_model)",className="notebook-row__desc")]),
+                        html.Div(className="notebook-row", children=[
+                            html.Span("data/raw/ADNIMERGE.csv",  className="notebook-row__name"),
+                            html.Span("Source table (local only)",className="notebook-row__desc")]),
+                    ]),
+                ])
+            ]),
+        ]),
+
+        # ── Footer ────────────────────────────────────────────────────────
+        html.Footer(className="site-footer", children=[
+            html.Div(className="site-footer__inner", children=[
+                html.P("Alzheimer's digital twin — exploratory research software. Not a medical device."),
+                html.P(f"Project by {', '.join(TEAM_MEMBERS)}.", className="site-footer__team"),
+            ])
+        ]),
+
+        # ── Lightbox modal (JS-controlled) ────────────────────────────────
+        build_lightbox(),
+    ])
 
 
+# ── App init ──────────────────────────────────────────────────────────────────
 app = Dash(
     __name__,
     external_stylesheets=[
         "https://fonts.googleapis.com/css2?"
-        "family=DM+Sans:ital,wght@0,400;0,500;1,400&"
+        "family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&"
         "family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&"
         "display=swap",
     ],
@@ -1018,11 +1002,314 @@ app.layout = build_layout()
 server = app.server
 
 
-if DEMO_SIM and DEMO_SIM.get("patients"):
+# ── Custom CSS + JS injected via index_string ─────────────────────────────────
+_CUSTOM_CSS = """
+/* ── Hero byline ─────────────────────────────────────────────────── */
+.hero__byline {
+  margin-top: 1.25rem;
+  font-size: 0.8125rem;
+  font-family: 'DM Sans', sans-serif;
+  color: #7a7a73;
+  letter-spacing: 0.03em;
+  line-height: 1.6;
+}
+.hero__byline-label {
+  color: #8fa396;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  margin-right: 0.25rem;
+}
 
+/* ── Footer team line ────────────────────────────────────────────── */
+.site-footer__inner { display: flex; flex-direction: column; gap: 0.25rem; }
+.site-footer__team  { font-size: 0.75rem; color: #9a9a92; }
+
+/* ── Gallery card — hover & click affordance ─────────────────────── */
+.figure-card {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.28s ease;
+  border-radius: 8px;
+}
+.figure-card:hover {
+  transform: translateY(-6px) scale(1.012);
+  box-shadow: 0 18px 44px rgba(47,79,63,0.16), 0 4px 10px rgba(0,0,0,0.07);
+  z-index: 2;
+}
+.figure-card::after {
+  content: 'Click to explore →';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    rgba(47,79,63,0.93) 0%,
+    rgba(143,163,150,0.88) 100%);
+  color: rgba(255,255,255,0.97);
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.figure-card:hover::after { opacity: 1; }
+.figure-card figcaption   { transition: color 0.2s ease; }
+.figure-card:hover figcaption { color: #2f4f3f; }
+
+/* ── Lightbox overlay ────────────────────────────────────────────── */
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(6, 8, 7, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+.lb-overlay.lb-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Lightbox card ───────────────────────────────────────────────── */
+.lb-card {
+  display: flex;
+  width: min(1120px, 96vw);
+  max-height: 90vh;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 40px 90px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04);
+  transform: scale(0.90) translateY(20px);
+  opacity: 0;
+  transition: transform 0.38s cubic-bezier(0.34,1.46,0.64,1),
+              opacity 0.28s ease;
+}
+.lb-overlay.lb-active .lb-card {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* ── Image pane ──────────────────────────────────────────────────── */
+.lb-img-pane {
+  flex: 0 0 58%;
+  background: #080b09;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem;
+  min-height: 400px;
+  overflow: hidden;
+}
+.lb-img-pane img {
+  max-width: 100%;
+  max-height: 86vh;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+}
+
+/* ── Info pane ───────────────────────────────────────────────────── */
+.lb-info-pane {
+  flex: 0 0 42%;
+  background: #fafaf7;
+  display: flex;
+  flex-direction: column;
+  padding: 2.25rem 2rem 1.5rem;
+  overflow-y: auto;
+  position: relative;
+}
+.lb-label {
+  font-size: 0.6875rem;
+  font-family: 'DM Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8fa396;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.lb-title {
+  font-size: 1.25rem;
+  font-family: 'Fraunces', Georgia, serif;
+  color: #121211;
+  font-weight: 500;
+  line-height: 1.35;
+  margin: 0 2.5rem 1.25rem 0;
+}
+.lb-divider {
+  width: 36px;
+  height: 2px;
+  background: #2f4f3f;
+  border-radius: 2px;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
+}
+.lb-explanation {
+  font-size: 0.9375rem;
+  font-family: 'DM Sans', sans-serif;
+  color: #4a4a44;
+  line-height: 1.78;
+  flex: 1;
+}
+.lb-explanation p          { margin: 0 0 0.875rem; }
+.lb-explanation p:last-child { margin-bottom: 0; }
+.lb-explanation strong     { color: #2f4f3f; font-weight: 600; }
+.lb-explanation em         { color: #5a5a50; }
+.lb-explanation ul         { margin: 0.5rem 0 0.875rem; padding-left: 1.25rem; }
+.lb-explanation li         { margin-bottom: 0.4rem; }
+.lb-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e6e6e0; }
+.lb-scroll-hint {
+  font-size: 0.75rem;
+  color: #b0b0a8;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+}
+
+/* ── Close button ────────────────────────────────────────────────── */
+.lb-close {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.07);
+  color: #3c3c38;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+.lb-close:hover { background: rgba(0,0,0,0.14); transform: scale(1.12); }
+
+/* ── Responsive: stack panes on narrow screens ───────────────────── */
+@media (max-width: 740px) {
+  .lb-card { flex-direction: column; width: 96vw; }
+  .lb-img-pane { flex: none; max-height: 38vh; padding: 1rem; }
+  .lb-info-pane { flex: 1; min-height: 0; padding: 1.5rem 1.25rem; }
+  .lb-title { font-size: 1.05rem; margin-right: 2rem; }
+}
+"""
+
+_LIGHTBOX_JS = f"""
+(function () {{
+  /* ── Image info dictionary ── */
+  {_JS_IMAGE_INFO_CONST}
+
+  /* ── Open lightbox on figure-card click (event delegation) ── */
+  document.body.addEventListener('click', function (e) {{
+    var card = e.target.closest('.figure-card');
+    if (!card) return;
+    var img = card.querySelector('img');
+    if (!img) return;
+
+    /* Key = filename without extension */
+    var src      = img.src || '';
+    var filename = src.split('/').pop();
+    var key      = filename.replace(/\\.png$/i, '');
+    var info     = IMAGE_INFO[key] || {{
+      title: (card.querySelector('figcaption') || {{}}).textContent || filename,
+      html:  '<p>No additional description is available for this image.</p>'
+    }};
+
+    var overlay = document.getElementById('lightbox-overlay');
+    if (!overlay) return;
+
+    overlay.querySelector('#lb-main-img').src    = img.src;
+    overlay.querySelector('#lb-title').textContent = info.title;
+    overlay.querySelector('#lb-explanation').innerHTML = info.html;
+
+    /* Scroll info pane to top */
+    var infoPne = overlay.querySelector('.lb-info-pane');
+    if (infoPne) infoPne.scrollTop = 0;
+
+    overlay.classList.add('lb-active');
+    document.body.style.overflow = 'hidden';
+  }});
+
+  /* ── Close on overlay backdrop or × button ── */
+  document.addEventListener('click', function (e) {{
+    var overlay = document.getElementById('lightbox-overlay');
+    if (!overlay) return;
+    if (e.target === overlay || e.target.closest('.lb-close')) {{
+      overlay.classList.remove('lb-active');
+      document.body.style.overflow = '';
+      /* clear src after transition to avoid stale image flash */
+      setTimeout(function () {{
+        if (!overlay.classList.contains('lb-active')) {{
+          overlay.querySelector('#lb-main-img').src = '';
+        }}
+      }}, 320);
+    }}
+  }});
+
+  /* ── Close on Escape key ── */
+  document.addEventListener('keydown', function (e) {{
+    if (e.key === 'Escape') {{
+      var overlay = document.getElementById('lightbox-overlay');
+      if (overlay && overlay.classList.contains('lb-active')) {{
+        overlay.classList.remove('lb-active');
+        document.body.style.overflow = '';
+      }}
+    }}
+  }});
+}})();
+"""
+
+app.index_string = (
+    """<!DOCTYPE html>
+<html>
+  <head>
+    {%metas%}
+    <title>{%title%}</title>
+    {%favicon%}
+    {%css%}
+    <style>
+"""
+    + _CUSTOM_CSS
+    + """
+    </style>
+  </head>
+  <body>
+    {%app_entry%}
+    <footer>
+      {%config%}
+      {%scripts%}
+      {%renderer%}
+    </footer>
+    <script>
+"""
+    + _LIGHTBOX_JS
+    + """
+    </script>
+  </body>
+</html>"""
+)
+
+
+# ── Callbacks ─────────────────────────────────────────────────────────────────
+if DEMO_SIM and DEMO_SIM.get("patients"):
     @app.callback(
-        Output("demo-graph-mmse", "figure"),
-        Output("demo-graph-hippo", "figure"),
+        Output("demo-graph-mmse",   "figure"),
+        Output("demo-graph-hippo",  "figure"),
         Output("demo-patient-meta", "children"),
         Input("demo-patient-select", "value"),
     )
@@ -1035,9 +1322,10 @@ if DEMO_SIM and DEMO_SIM.get("patients"):
         )
 
 
+# ── Static file serving ───────────────────────────────────────────────────────
 @server.route("/hub-results/<path:subpath>")
 def hub_results(subpath: str):
-    """Serve PNGs from results/ for the gallery (path traversal safe)."""
+    """Serve PNGs from results/ (path-traversal safe)."""
     try:
         rel = Path(subpath)
         if rel.is_absolute() or ".." in rel.parts:
