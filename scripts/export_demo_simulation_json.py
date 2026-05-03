@@ -213,8 +213,20 @@ def main() -> int:
         return 1
     df = load_frame()
     if CKPT_PATH.is_file():
-        print("Using LSTM checkpoint for rollout…")
-        method, patients = lstm_rollout(df)
+        try:
+            import torch  # noqa: F401 — heavy dep; only needed for LSTM path
+        except ModuleNotFoundError:
+            print(
+                "Checkpoint found at models/checkpoints/lstm_best.pt but `torch` is not installed. "
+                "Using linear extrapolation instead.\n"
+                "  Install: pip install torch\n"
+                "  Or use the project venv: .venv/bin/python scripts/export_demo_simulation_json.py",
+                file=sys.stderr,
+            )
+            method, patients = linear_export(df)
+        else:
+            print("Using LSTM checkpoint for rollout…")
+            method, patients = lstm_rollout(df)
     else:
         print("No checkpoint; using linear extrapolation (re-run after training to upgrade).")
         method, patients = linear_export(df)
