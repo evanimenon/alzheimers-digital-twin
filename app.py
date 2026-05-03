@@ -11,11 +11,34 @@ import json
 from pathlib import Path
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from dash import Dash, dcc, html
+from flask import abort, send_from_directory
+from plotly.subplots import make_subplots
 
 ROOT = Path(__file__).resolve().parent
 METRICS_PATH = ROOT / "results" / "metrics" / "lstm_metrics.json"
+SIMULATION_PATH = ROOT / "results" / "metrics" / "simulation_summary.json"
+RESULTS_ROOT = (ROOT / "results").resolve()
+
+# Curated gallery: relative to results/ — only these paths are linked from the UI.
+GALLERY_VISUALS: list[tuple[str, str]] = [
+    ("visualizations/results_dashboard.png", "Consolidated analysis dashboard"),
+    ("visualizations/population_trajectories.png", "Population trajectories"),
+    ("visualizations/demo_trajectories.png", "Demo patient trajectories"),
+    ("visualizations/hippocampus_atrophy.png", "Hippocampus atrophy"),
+    ("visualizations/monte_carlo_ci.png", "Monte Carlo uncertainty"),
+    ("visualizations/all_patients_simulation.png", "All-patient simulation"),
+    ("visualizations/subgroup_analysis.png", "Subgroup analysis"),
+    ("visualizations/what_if_apoe4.png", "What-if: APOE4"),
+    ("visualizations/what_if_intervention.png", "What-if: intervention"),
+]
+
+GALLERY_METRICS_PNG: list[tuple[str, str]] = [
+    ("metrics/confusion_matrix.png", "Confusion matrix (classification)"),
+    ("metrics/roc_curves.png", "ROC curves"),
+    ("metrics/feature_importance.png", "Feature importance"),
+    ("metrics/shap_importance.png", "SHAP summary"),
+]
 
 
 def load_metrics() -> dict | None:
@@ -27,11 +50,25 @@ def load_metrics() -> dict | None:
         return None
 
 
+def load_simulation_summary() -> dict | None:
+    if not SIMULATION_PATH.exists():
+        return None
+    try:
+        return json.loads(SIMULATION_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def hub_asset_url(rel: str) -> str:
+    """URL path served by hub_results (relative to results/)."""
+    return f"/hub-results/{rel.replace(chr(92), '/')}"
+
+
 def metrics_figure(data: dict | None) -> go.Figure:
-    if not data:
+    if not data or not all(k in data for k in ("mmse_mae", "mmse_r2", "hippo_mae", "hippo_r2")):
         fig = go.Figure()
         fig.add_annotation(
-            text="No metrics file yet.<br><sub>Train the model and write results/metrics/lstm_metrics.json</sub>",
+            text="No regression metrics yet.<br><sub>Export MMSE / hippocampus metrics to lstm_metrics.json</sub>",
             xref="paper",
             yref="paper",
             x=0.5,
@@ -49,10 +86,10 @@ def metrics_figure(data: dict | None) -> go.Figure:
         )
         return fig
 
-    mmse_mae = float(data.get("mmse_mae", 0))
-    mmse_r2 = float(data.get("mmse_r2", 0))
-    hippo_mae = float(data.get("hippo_mae", 0))
-    hippo_r2 = float(data.get("hippo_r2", 0))
+    mmse_mae = float(data["mmse_mae"])
+    mmse_r2 = float(data["mmse_r2"])
+    hippo_mae = float(data["hippo_mae"])
+    hippo_r2 = float(data["hippo_r2"])
 
     fig = make_subplots(
         rows=2,
@@ -107,7 +144,40 @@ def metrics_figure(data: dict | None) -> go.Figure:
     return fig
 
 
-def metric_cards(data: dict | None) -> html.Div:
+def classification_figure(data: dict | None) -> go.Figure | None:
+    if not data:
+        return None
+    if not all(k in data for k in ("clf3_cv_accuracy", "mci_conv_auc_cv")):
+        return None
+    acc = float(data["clf3_cv_accuracy"])
+    auc = float(data["mci_conv_auc_cv"])
+    acc_std = float(data.get("clf3_cv_accuracy_std", 0) or 0)
+    auc_std = float(data.get("mci_conv_auc_cv_std", 0) or 0)
+
+    fig = go.Figure(
+        go.Bar(
+            x=["3-class accuracy (CV)", "MCI → Dementia AUC (CV)"],
+            y=[acc, auc],
+            error_y=dict(type="data", array=[acc_std, auc_std], color="#7a7a73", thickness=1.5, width=6),
+            marker=dict(color=["#2f4f3f", "#8fa396"], line=dict(width=0)),
+            text=[f"{acc:.3f} ± {acc_std:.3f}", f"{auc:.3f} ± {auc_std:.3f}"],
+            textposition="outside",
+            textfont=dict(size=11, color="#3c3c38"),
+        )
+    )
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#fafaf7",
+        font=dict(family="DM Sans, sans-serif", color="#3c3c38", size=12),
+        xaxis=dict(showgrid=False, linecolor="#e6e6e0", tickfont=dict(size=11)),
+        yaxis=dict(gridcolor="#e6e6e0", zeroline=False, range=[0, 1.05], title=dict(text="Score", font=dict(size=11, color="#7a7a73"))),
+        margin=dict(l=48, r=28, t=28, b=72),
+        height=300,
+    )
+    return fig
+
+
+def regression_metric_cards(data: dict | None) -> html.Div:
     if not data:
         return html.Div(
             className="metrics-grid",
@@ -115,10 +185,10 @@ def metric_cards(data: dict | None) -> html.Div:
                 html.Div(
                     className="metric-card",
                     children=[
-                        html.Span("Metrics", className="metric-card__label"),
+                        html.Span("Regression", className="metric-card__label"),
                         html.Div("—", className="metric-card__value"),
                         html.P(
-                            "Run training and export lstm_metrics.json to populate this panel.",
+                            "Export lstm_metrics.json after LSTM training.",
                             className="metric-card__hint",
                         ),
                     ],
@@ -126,12 +196,44 @@ def metric_cards(data: dict | None) -> html.Div:
             ],
         )
 
-    items = [
-        ("MMSE — mean absolute error", f"{float(data['mmse_mae']):.4f}", "Lower is better"),
-        ("MMSE — R²", f"{float(data['mmse_r2']):.4f}", "Variance explained"),
-        ("Hippocampus — MAE", f"{float(data['hippo_mae']):.2f}", "Lower is better"),
-        ("Hippocampus — R²", f"{float(data['hippo_r2']):.4f}", "Variance explained"),
+    specs = [
+        ("mmse_mae", "MMSE — mean absolute error", "{:.4f}", "Lower is better"),
+        ("mmse_r2", "MMSE — R²", "{:.4f}", "Variance explained"),
+        ("hippo_mae", "Hippocampus — MAE", "{:.2f}", "Lower is better"),
+        ("hippo_r2", "Hippocampus — R²", "{:.4f}", "Variance explained"),
     ]
+    cards = []
+    for key, label, fmt, hint in specs:
+        if key not in data:
+            continue
+        val = float(data[key])
+        cards.append(
+            html.Div(
+                className="metric-card",
+                children=[
+                    html.Span(label, className="metric-card__label"),
+                    html.Div(fmt.format(val), className="metric-card__value"),
+                    html.P(hint, className="metric-card__hint"),
+                ],
+            )
+        )
+    if not cards:
+        return regression_metric_cards(None)
+    return html.Div(className="metrics-grid", children=cards)
+
+
+def classification_metric_cards(data: dict | None) -> html.Div | None:
+    if not data or "clf3_cv_accuracy" not in data:
+        return None
+    acc = float(data["clf3_cv_accuracy"])
+    acc_std = float(data.get("clf3_cv_accuracy_std", 0) or 0)
+    items: list[tuple[str, str, str]] = [
+        ("3-class accuracy (CV)", f"{acc:.4f} ± {acc_std:.4f}", "Stratified CV, XGBoost"),
+    ]
+    if "mci_conv_auc_cv" in data:
+        auc = float(data["mci_conv_auc_cv"])
+        auc_std = float(data.get("mci_conv_auc_cv_std", 0) or 0)
+        items.append(("MCI → Dementia AUC (CV)", f"{auc:.4f} ± {auc_std:.4f}", "Conversion risk ranking"))
     return html.Div(
         className="metrics-grid",
         children=[
@@ -148,8 +250,149 @@ def metric_cards(data: dict | None) -> html.Div:
     )
 
 
+def simulation_metric_cards(sim: dict | None) -> html.Div | None:
+    if not sim:
+        return None
+    mapping: list[tuple[str, str, str, str]] = [
+        ("base_patient", "Base patient RID", "{}", "Anchor record for twin runs"),
+        ("n_future_visits", "Future visits simulated", "{}", "Horizon length"),
+        ("mc_samples", "Monte Carlo samples", "{}", "Draws for uncertainty"),
+        ("mc_ci90_width_last", "90% CI width (last visit)", "{:.2f}", "MMSE points, approximate"),
+        ("apoe4_mmse_spread", "APOE4 MMSE spread", "{:.2f}", "Exploratory what-if delta"),
+        ("intervention_40pct_benefit", "40% intervention benefit", "{:.2f}", "MMSE change vs baseline path"),
+    ]
+    cards = []
+    for key, label, fmt, hint in mapping:
+        if key not in sim:
+            continue
+        raw = sim[key]
+        if isinstance(raw, float):
+            val = fmt.format(raw)
+        else:
+            val = str(raw)
+        cards.append(
+            html.Div(
+                className="metric-card",
+                children=[
+                    html.Span(label, className="metric-card__label"),
+                    html.Div(val, className="metric-card__value"),
+                    html.P(hint, className="metric-card__hint"),
+                ],
+            )
+        )
+    if not cards:
+        return None
+    return html.Div(className="metrics-grid", children=cards)
+
+
+def figure_gallery_rows(groups: list[tuple[str, list[tuple[str, str]]]]) -> list:
+    """Build figure elements; skip missing files."""
+    rows: list = []
+    for group_title, entries in groups:
+        present = [(rel, cap) for rel, cap in entries if (RESULTS_ROOT / rel).is_file()]
+        if not present:
+            continue
+        rows.append(html.H3(group_title, className="metrics-block__title"))
+        rows.append(
+            html.Div(
+                className="gallery-grid",
+                children=[
+                    html.Figure(
+                        className="figure-card",
+                        children=[
+                            html.Img(src=hub_asset_url(rel), alt=cap),
+                            html.Figcaption(cap),
+                        ],
+                    )
+                    for rel, cap in present
+                ],
+            )
+        )
+    return rows
+
+
 def build_layout() -> html.Div:
     metrics = load_metrics()
+    simulation = load_simulation_summary()
+    clf_fig = classification_figure(metrics)
+
+    gallery_children = figure_gallery_rows(
+        [
+            ("Trajectory & policy figures", GALLERY_VISUALS),
+            ("Model diagnostics", GALLERY_METRICS_PNG),
+        ]
+    )
+
+    metrics_children: list = [
+        html.P("Evidence", className="section__label"),
+        html.H2("Exported metrics & charts.", className="section__title"),
+        html.P(
+            "Regression and classification values are read from results/metrics/lstm_metrics.json. "
+            "Simulation summaries use simulation_summary.json when present.",
+            className="section__lead",
+        ),
+        html.Div(
+            className="metrics-block",
+            children=[
+                html.H3("Regression (LSTM)", className="metrics-block__title"),
+                html.P("MMSE and hippocampal volume heads.", className="metrics-block__lead"),
+                regression_metric_cards(metrics),
+                html.Div(
+                    className="chart-wrap",
+                    children=[
+                        dcc.Graph(
+                            id="metrics-chart",
+                            figure=metrics_figure(metrics),
+                            config=dict(displayModeBar=False),
+                            style={"height": "380px"},
+                        )
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+    clf_cards = classification_metric_cards(metrics)
+    if clf_cards:
+        clf_block: list = [
+            html.H3("Classification (XGBoost)", className="metrics-block__title"),
+            html.P(
+                "Three-class diagnosis and MCI-to-dementia conversion signals from the patient-level pipeline.",
+                className="metrics-block__lead",
+            ),
+            clf_cards,
+        ]
+        if clf_fig:
+            clf_block.append(
+                html.Div(
+                    className="chart-wrap",
+                    children=[
+                        dcc.Graph(
+                            id="clf-chart",
+                            figure=clf_fig,
+                            config=dict(displayModeBar=False),
+                            style={"height": "320px"},
+                        )
+                    ],
+                )
+            )
+        metrics_children.append(html.Div(className="metrics-block", children=clf_block))
+
+    sim_cards = simulation_metric_cards(simulation)
+    if sim_cards:
+        metrics_children.append(
+            html.Div(
+                className="metrics-block",
+                children=[
+                    html.H3("Simulation snapshot", className="metrics-block__title"),
+                    html.P(
+                        "Monte Carlo-style summaries exported with the simulation notebook.",
+                        className="metrics-block__lead",
+                    ),
+                    sim_cards,
+                ],
+            )
+        )
 
     return html.Div(
         className="shell",
@@ -167,6 +410,7 @@ def build_layout() -> html.Div:
                                     html.Li(html.A("About", href="#about")),
                                     html.Li(html.A("Pipeline", href="#pipeline")),
                                     html.Li(html.A("Metrics", href="#metrics")),
+                                    html.Li(html.A("Gallery", href="#gallery")),
                                     html.Li(html.A("Notebooks", href="#notebooks")),
                                 ],
                             ),
@@ -189,8 +433,8 @@ def build_layout() -> html.Div:
                                         className="hero__title",
                                     ),
                                     html.P(
-                                        "A quiet workspace for longitudinal ADNI signals, "
-                                        "sequence modelling, and calibrated outcomes you can reason about—not just numbers on a slide.",
+                                        "Longitudinal ADNI signals, sequence models, classification, "
+                                        "visual analytics, and simulation—presented with room to breathe.",
                                         className="hero__subtitle",
                                     ),
                                     html.Div(className="hero__rule"),
@@ -219,8 +463,9 @@ def build_layout() -> html.Div:
                                                         "volume, and genetics—aligned in time where possible."
                                                     ),
                                                     html.P(
-                                                        "The goal is not spectacle. It is reproducible pipelines, honest "
-                                                        "metrics, and enough whitespace in the interface that you can think."
+                                                        "Recent work adds patient-level classification (three-class diagnosis and "
+                                                        "MCI-to-dementia conversion), a visualization dashboard, and Monte Carlo–style "
+                                                        "simulation exports alongside the original LSTM regression path."
                                                     ),
                                                 ],
                                             ),
@@ -228,10 +473,9 @@ def build_layout() -> html.Div:
                                                 className="prose",
                                                 children=[
                                                     html.P(
-                                                        "Data centre on ADNIMERGE-style tables (e.g. MMSE, diagnosis, "
-                                                        "hippocampal volume, APOE4, education, visit index). The LSTM path "
-                                                        "uses five aligned features per sequence, with exported JSON metrics "
-                                                        "for MMSE and hippocampus targets."
+                                                        "Data centre on ADNIMERGE-style tables. The LSTM stack uses aligned "
+                                                        "feature sequences; XGBoost models consume engineered patient snapshots; "
+                                                        "figures and JSON summaries land under results/ for this hub to surface."
                                                     ),
                                                 ],
                                             ),
@@ -249,9 +493,9 @@ def build_layout() -> html.Div:
                                 className="section__inner",
                                 children=[
                                     html.P("Flow", className="section__label"),
-                                    html.H2("From raw cohort to twin signals.", className="section__title"),
+                                    html.H2("From cohort to twin scenarios.", className="section__title"),
                                     html.P(
-                                        "Three beats—ingest, model, interpret—kept visually light so the emphasis stays on meaning.",
+                                        "Five beats that mirror the notebooks—kept visually light.",
                                         className="section__lead",
                                     ),
                                     html.Div(
@@ -263,8 +507,8 @@ def build_layout() -> html.Div:
                                                     html.Div("01", className="pipeline__num"),
                                                     html.H3("Curate"),
                                                     html.P(
-                                                        "Load and filter longitudinal rows; harmonise codes; "
-                                                        "carry forward defensible missingness rules."
+                                                        "Load and filter longitudinal rows; harmonise diagnosis codes; "
+                                                        "document missingness."
                                                     ),
                                                 ],
                                             ),
@@ -274,8 +518,8 @@ def build_layout() -> html.Div:
                                                     html.Div("02", className="pipeline__num"),
                                                     html.H3("Encode"),
                                                     html.P(
-                                                        "Sequence windows (e.g. up to eight visits) with scaled features "
-                                                        "matching the trained checkpoint shape."
+                                                        "Sequence windows for the LSTM with scaled features matching the "
+                                                        "trained checkpoint."
                                                     ),
                                                 ],
                                             ),
@@ -283,10 +527,32 @@ def build_layout() -> html.Div:
                                                 className="pipeline__step",
                                                 children=[
                                                     html.Div("03", className="pipeline__num"),
-                                                    html.H3("Project"),
+                                                    html.H3("Classify"),
                                                     html.P(
-                                                        "LSTM heads for MMSE and hippocampus; metrics and history written "
-                                                        "under results/ for this hub to read."
+                                                        "XGBoost pipelines for three-class diagnosis and MCI→Dementia conversion, "
+                                                        "with CV metrics exported to JSON."
+                                                    ),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="pipeline__step",
+                                                children=[
+                                                    html.Div("04", className="pipeline__num"),
+                                                    html.H3("Visualize"),
+                                                    html.P(
+                                                        "Trajectory plots, subgroup views, SHAP, ROC, and consolidated dashboards "
+                                                        "written to results/visualizations and results/metrics."
+                                                    ),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="pipeline__step",
+                                                children=[
+                                                    html.Div("05", className="pipeline__num"),
+                                                    html.H3("Simulate"),
+                                                    html.P(
+                                                        "What-if and Monte Carlo summaries—patient anchors, intervention deltas, "
+                                                        "and uncertainty bands—exported for review."
                                                     ),
                                                 ],
                                             ),
@@ -296,30 +562,30 @@ def build_layout() -> html.Div:
                             )
                         ],
                     ),
+                    html.Section(id="metrics", className="section", children=[html.Div(className="section__inner", children=metrics_children)]),
                     html.Section(
-                        id="metrics",
+                        id="gallery",
                         className="section",
                         children=[
                             html.Div(
                                 className="section__inner",
                                 children=[
-                                    html.P("Evidence", className="section__label"),
-                                    html.H2("Latest model metrics.", className="section__title"),
+                                    html.P("Figures", className="section__label"),
+                                    html.H2("Static outputs from the analysis stack.", className="section__title"),
                                     html.P(
-                                        "Values are read from results/metrics/lstm_metrics.json when present.",
+                                        "PNG exports produced by the visualization and classification notebooks. "
+                                        "Missing files are omitted automatically.",
                                         className="section__lead",
                                     ),
-                                    metric_cards(metrics),
-                                    html.Div(
-                                        className="chart-wrap",
-                                        children=[
-                                            dcc.Graph(
-                                                id="metrics-chart",
-                                                figure=metrics_figure(metrics),
-                                                config=dict(displayModeBar=False),
-                                                style={"height": "320px"},
+                                    *(
+                                        gallery_children
+                                        if gallery_children
+                                        else [
+                                            html.P(
+                                                "No figure files found under results/. Run the visualization notebook to populate this gallery.",
+                                                className="section__lead",
                                             )
-                                        ],
+                                        ]
                                     ),
                                 ],
                             )
@@ -352,14 +618,35 @@ def build_layout() -> html.Div:
                                                 className="notebook-row",
                                                 children=[
                                                     html.Span("02_lstm_model.ipynb", className="notebook-row__name"),
-                                                    html.Span("LSTM, plots, metrics export", className="notebook-row__desc"),
+                                                    html.Span("LSTM training & regression metrics", className="notebook-row__desc"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="notebook-row",
+                                                children=[
+                                                    html.Span("03_classification.ipynb", className="notebook-row__name"),
+                                                    html.Span("XGBoost diagnosis & conversion", className="notebook-row__desc"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="notebook-row",
+                                                children=[
+                                                    html.Span("04_visualization.ipynb", className="notebook-row__name"),
+                                                    html.Span("Dashboards, trajectories, SHAP / ROC", className="notebook-row__desc"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="notebook-row",
+                                                children=[
+                                                    html.Span("05_simulation.ipynb", className="notebook-row__name"),
+                                                    html.Span("What-if & Monte Carlo summaries", className="notebook-row__desc"),
                                                 ],
                                             ),
                                             html.Div(
                                                 className="notebook-row",
                                                 children=[
                                                     html.Span("data/raw/ADNIMERGE.csv", className="notebook-row__name"),
-                                                    html.Span("Source table (not shipped to UI)", className="notebook-row__desc"),
+                                                    html.Span("Source table (local only)", className="notebook-row__desc"),
                                                 ],
                                             ),
                                         ],
@@ -394,6 +681,22 @@ app = Dash(
 )
 app.layout = build_layout()
 server = app.server
+
+
+@server.route("/hub-results/<path:subpath>")
+def hub_results(subpath: str):
+    """Serve PNGs from results/ for the gallery (path traversal safe)."""
+    try:
+        rel = Path(subpath)
+        if rel.is_absolute() or ".." in rel.parts:
+            abort(404)
+        candidate = (RESULTS_ROOT / rel).resolve()
+        candidate.relative_to(RESULTS_ROOT)
+    except (ValueError, OSError):
+        abort(404)
+    if not candidate.is_file() or candidate.suffix.lower() != ".png":
+        abort(404)
+    return send_from_directory(str(candidate.parent), candidate.name)
 
 
 if __name__ == "__main__":
