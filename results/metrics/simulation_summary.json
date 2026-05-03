@@ -4,5 +4,5 @@
   "apoe4_mmse_spread": 4.17,
   "mc_samples": 200,
   "mc_ci90_width_last": 1.08,
-  "intervention_40pct_benefit": -0.59
+  "intervention_40pct_benefit": 0.25
 }
