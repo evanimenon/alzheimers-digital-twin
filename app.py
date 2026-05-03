@@ -11,13 +11,14 @@ import json
 from pathlib import Path
 
 import plotly.graph_objects as go
-from dash import Dash, dcc, html
+from dash import Dash, Input, Output, dcc, html
 from flask import abort, send_from_directory
 from plotly.subplots import make_subplots
 
 ROOT = Path(__file__).resolve().parent
 METRICS_PATH = ROOT / "results" / "metrics" / "lstm_metrics.json"
 SIMULATION_PATH = ROOT / "results" / "metrics" / "simulation_summary.json"
+DEMO_SIM_PATH = ROOT / "results" / "metrics" / "demo_patients_simulation.json"
 RESULTS_ROOT = (ROOT / "results").resolve()
 
 # Curated gallery: relative to results/ — only these paths are linked from the UI.
@@ -57,6 +58,18 @@ def load_simulation_summary() -> dict | None:
         return json.loads(SIMULATION_PATH.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+
+
+def load_demo_simulation() -> dict | None:
+    if not DEMO_SIM_PATH.exists():
+        return None
+    try:
+        return json.loads(DEMO_SIM_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+DEMO_SIM = load_demo_simulation()
 
 
 def hub_asset_url(rel: str) -> str:
@@ -311,6 +324,267 @@ def figure_gallery_rows(groups: list[tuple[str, list[tuple[str, str]]]]) -> list
     return rows
 
 
+def _demo_patient(demo: dict, rid: str) -> dict | None:
+    if not demo or "patients" not in demo:
+        return None
+    return demo["patients"].get(str(rid))
+
+
+def _plotly_layout_base(title: str, yaxis_title: str, height: int = 400) -> dict:
+    return dict(
+        title=dict(text=title, font=dict(family="Fraunces, Georgia, serif", size=16, color="#121211"), x=0, xanchor="left"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#fafaf7",
+        font=dict(family="DM Sans, sans-serif", size=12, color="#3c3c38"),
+        margin=dict(l=52, r=28, t=72, b=52),
+        height=height,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(
+            title=dict(text="Visit number", font=dict(size=11, color="#7a7a73")),
+            gridcolor="#e6e6e0",
+            zeroline=False,
+            linecolor="#e6e6e0",
+        ),
+        yaxis=dict(
+            title=dict(text=yaxis_title, font=dict(size=11, color="#7a7a73")),
+            gridcolor="#e6e6e0",
+            zeroline=False,
+            linecolor="#e6e6e0",
+        ),
+        hovermode="x unified",
+    )
+
+
+def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
+    fig = go.Figure()
+    if not demo:
+        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
+        fig.add_annotation(text="Add results/metrics/demo_patients_simulation.json", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+    p = _demo_patient(demo, rid)
+    if not p:
+        fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
+        fig.add_annotation(text="Patient not found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+
+    v_obs, m_obs = p["visits_obs"], p["mmse_obs"]
+    v_roll = [v_obs[-1]] + p["pred_visits"]
+    m_roll = [m_obs[-1]] + p["mmse_pred"]
+
+    fig.add_trace(
+        go.Scatter(
+            x=v_obs,
+            y=m_obs,
+            mode="lines+markers",
+            name="Observed (ADNI)",
+            line=dict(color="#2f4f3f", width=2.8),
+            marker=dict(size=9, color="#2f4f3f"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=v_roll,
+            y=m_roll,
+            mode="lines+markers",
+            name="Predicted (twin rollout)",
+            line=dict(color="#8fa396", width=2.2, dash="dash"),
+            marker=dict(size=8, symbol="square", color="#8fa396"),
+        )
+    )
+    int_m = p.get("mmse_pred_intervention_40pct")
+    if int_m:
+        m_int = [m_obs[-1]] + list(int_m)
+        fig.add_trace(
+            go.Scatter(
+                x=v_roll,
+                y=m_int,
+                mode="lines+markers",
+                name="40% decline attenuation",
+                line=dict(color="#5a8f6f", width=2, dash="dot"),
+                marker=dict(size=7, symbol="diamond", color="#5a8f6f"),
+            )
+        )
+    fig.add_hline(y=24, line_dash="dot", line_color="#c4c4bd", opacity=0.9)
+    fig.add_annotation(
+        xref="paper",
+        yref="y",
+        x=0.01,
+        y=24.6,
+        text="MCI threshold (24)",
+        showarrow=False,
+        font=dict(size=10, color="#7a7a73"),
+        xanchor="left",
+    )
+    fig.update_layout(**_plotly_layout_base(f"MMSE — RID {p['rid']}", "MMSE score"))
+    fig.update_yaxes(range=[0, 32])
+    return fig
+
+
+def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
+    fig = go.Figure()
+    if not demo:
+        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+    p = _demo_patient(demo, rid)
+    if not p:
+        fig.update_layout(**_plotly_layout_base("Hippocampus trajectory", "Volume (mm³)", 360))
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+
+    v_obs, h_obs = p["visits_obs"], p["hippo_obs"]
+    v_roll = [v_obs[-1]] + p["pred_visits"]
+    h_roll = [h_obs[-1]] + p["hippo_pred"]
+
+    fig.add_trace(
+        go.Scatter(
+            x=v_obs,
+            y=h_obs,
+            mode="lines+markers",
+            name="Observed (ADNI)",
+            line=dict(color="#2f4f3f", width=2.8),
+            marker=dict(size=9, color="#2f4f3f"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=v_roll,
+            y=h_roll,
+            mode="lines+markers",
+            name="Predicted (twin rollout)",
+            line=dict(color="#8fa396", width=2.2, dash="dash"),
+            marker=dict(size=8, symbol="square", color="#8fa396"),
+        )
+    )
+    fig.update_layout(**_plotly_layout_base(f"Hippocampus — RID {p['rid']}", "Hippocampus volume (mm³)"))
+    return fig
+
+
+def demo_meta_children(rid: str, demo: dict | None) -> list:
+    if not demo:
+        return [html.P("No demo bundle loaded.", className="demo-meta__empty")]
+    p = _demo_patient(demo, rid)
+    if not p:
+        return [html.P("Patient not found.", className="demo-meta__empty")]
+    method = demo.get("prediction_method", "unknown")
+    method_label = {
+        "lstm_rollout": "LSTM autoregressive rollout (matches notebook 05)",
+        "linear_extrapolation": "Linear extrapolation (checkpoint unavailable when JSON was built)",
+    }.get(method, method.replace("_", " "))
+    items = [
+        ("RID", str(p["rid"])),
+        ("APOEε4 alleles", str(p["apoe4"])),
+        ("Last observed diagnosis", str(p.get("dx_last", "—"))),
+        ("Observed visits", str(p.get("n_obs_visits", "—"))),
+        ("Future steps in JSON", str(len(p.get("pred_visits", [])))),
+        ("Forecast source", method_label),
+    ]
+    dl_children: list = []
+    for k, v in items:
+        dl_children.append(html.Dt(k, className="demo-meta__dt"))
+        dl_children.append(html.Dd(v, className="demo-meta__dd"))
+    return [html.Dl(className="demo-meta__dl", children=dl_children)]
+
+
+def build_demo_simulation_section() -> html.Section:
+    if DEMO_SIM and DEMO_SIM.get("patients"):
+        rids = [str(r) for r in DEMO_SIM.get("demo_rids", [])]
+        first = rids[0] if rids else None
+        patients = DEMO_SIM["patients"]
+        options = []
+        for r in rids:
+            pr = patients.get(r, {})
+            dx = str(pr.get("dx_last", "—"))
+            ap = pr.get("apoe4", "—")
+            options.append({"label": f"RID {r}  ·  {dx}  ·  APOEε4 = {ap}", "value": r})
+        return html.Section(
+            id="demo-simulation",
+            className="section",
+            children=[
+                html.Div(
+                    className="section__inner",
+                    children=[
+                        html.P("Interactive", className="section__label"),
+                        html.H2("Demo patient simulation.", className="section__title"),
+                        html.P(
+                            "Choose one of five curated ADNI subjects. Observed points come from the cohort table; "
+                            "curves ahead of the last visit are twin rollouts exported with the same logic as "
+                            "`05_simulation.ipynb` (regenerate via scripts/export_demo_simulation_json.py).",
+                            className="section__lead",
+                        ),
+                        html.Div(
+                            className="demo-toolbar",
+                            children=[
+                                html.Label("Patient", className="demo-toolbar__label", htmlFor="demo-patient-select"),
+                                dcc.Dropdown(
+                                    id="demo-patient-select",
+                                    options=options,
+                                    value=first,
+                                    clearable=False,
+                                    className="demo-dropdown",
+                                    style={"maxWidth": "28rem", "fontSize": "0.9375rem"},
+                                ),
+                            ],
+                        ),
+                        html.Div(id="demo-patient-meta", className="demo-meta", children=demo_meta_children(first or "", DEMO_SIM)),
+                        html.Div(
+                            className="demo-charts",
+                            children=[
+                                html.Div(
+                                    className="chart-wrap chart-wrap--demo",
+                                    children=[
+                                        dcc.Graph(
+                                            id="demo-graph-mmse",
+                                            figure=demo_mmse_figure(first or "", DEMO_SIM),
+                                            config=dict(displayModeBar=False),
+                                            style={"height": "420px"},
+                                        )
+                                    ],
+                                ),
+                                html.Div(
+                                    className="chart-wrap chart-wrap--demo",
+                                    children=[
+                                        dcc.Graph(
+                                            id="demo-graph-hippo",
+                                            figure=demo_hippo_figure(first or "", DEMO_SIM),
+                                            config=dict(displayModeBar=False),
+                                            style={"height": "420px"},
+                                        )
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ],
+                )
+            ],
+        )
+
+    return html.Section(
+        id="demo-simulation",
+        className="section",
+        children=[
+            html.Div(
+                className="section__inner",
+                children=[
+                    html.P("Interactive", className="section__label"),
+                    html.H2("Demo patient simulation.", className="section__title"),
+                    html.P(
+                        "Run scripts/export_demo_simulation_json.py (with data/raw/ADNIMERGE.csv and optionally "
+                        "models/checkpoints/lstm_best.pt) to write results/metrics/demo_patients_simulation.json, then reload this page.",
+                        className="section__lead",
+                    ),
+                ],
+            )
+        ],
+    )
+
+
 def build_layout() -> html.Div:
     metrics = load_metrics()
     simulation = load_simulation_summary()
@@ -410,6 +684,7 @@ def build_layout() -> html.Div:
                                     html.Li(html.A("About", href="#about")),
                                     html.Li(html.A("Pipeline", href="#pipeline")),
                                     html.Li(html.A("Metrics", href="#metrics")),
+                                    html.Li(html.A("Demo twin", href="#demo-simulation")),
                                     html.Li(html.A("Gallery", href="#gallery")),
                                     html.Li(html.A("Notebooks", href="#notebooks")),
                                 ],
@@ -563,6 +838,7 @@ def build_layout() -> html.Div:
                         ],
                     ),
                     html.Section(id="metrics", className="section", children=[html.Div(className="section__inner", children=metrics_children)]),
+                    build_demo_simulation_section(),
                     html.Section(
                         id="gallery",
                         className="section",
@@ -645,6 +921,20 @@ def build_layout() -> html.Div:
                                             html.Div(
                                                 className="notebook-row",
                                                 children=[
+                                                    html.Span("results/metrics/demo_patients_simulation.json", className="notebook-row__name"),
+                                                    html.Span("Observed + rollout series for the demo twin", className="notebook-row__desc"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="notebook-row",
+                                                children=[
+                                                    html.Span("scripts/export_demo_simulation_json.py", className="notebook-row__name"),
+                                                    html.Span("Regenerate demo JSON (LSTM or linear fallback)", className="notebook-row__desc"),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                className="notebook-row",
+                                                children=[
                                                     html.Span("data/raw/ADNIMERGE.csv", className="notebook-row__name"),
                                                     html.Span("Source table (local only)", className="notebook-row__desc"),
                                                 ],
@@ -681,6 +971,23 @@ app = Dash(
 )
 app.layout = build_layout()
 server = app.server
+
+
+if DEMO_SIM and DEMO_SIM.get("patients"):
+
+    @app.callback(
+        Output("demo-graph-mmse", "figure"),
+        Output("demo-graph-hippo", "figure"),
+        Output("demo-patient-meta", "children"),
+        Input("demo-patient-select", "value"),
+    )
+    def _update_demo_patient(rid: str | None):
+        r = str(rid) if rid else str(DEMO_SIM["demo_rids"][0])
+        return (
+            demo_mmse_figure(r, DEMO_SIM),
+            demo_hippo_figure(r, DEMO_SIM),
+            demo_meta_children(r, DEMO_SIM),
+        )
 
 
 @server.route("/hub-results/<path:subpath>")
