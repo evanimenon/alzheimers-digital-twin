@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 ROOT = Path(__file__).resolve().parent
 METRICS_PATH = ROOT / "results" / "metrics" / "lstm_metrics.json"
 SIMULATION_PATH = ROOT / "results" / "metrics" / "simulation_summary.json"
-DEMO_SIM_PATH = ROOT / "results" / "metrics" / "demo_patients_simulation.json"
+DEMO_DATA_PATH = ROOT / "results" / "metrics" / "demo_data.json"
 RESULTS_ROOT = (ROOT / "results").resolve()
 
 # Curated gallery: relative to results/ — only these paths are linked from the UI.
@@ -60,13 +60,77 @@ def load_simulation_summary() -> dict | None:
         return None
 
 
+def _hippo_for_visits(features: list, visit_list: list[float]) -> list[float]:
+    """Map ADNI visit_num → hippocampus volume from feature rows [MMSE, Hippo, APOE4, Edu, visit_num]."""
+    by_v: dict[int, float] = {}
+    for row in features:
+        if len(row) < 5:
+            continue
+        vn = int(float(row[4]))
+        by_v[vn] = float(row[1])
+    out: list[float] = []
+    for v in visit_list:
+        out.append(float(by_v.get(int(float(v)), float("nan"))))
+    return out
+
+
+def normalize_team_demo_data(raw: dict) -> dict | None:
+    """
+    Convert results/metrics/demo_data.json (from 02_lstm_model.ipynb) into the
+    internal shape expected by the demo twin charts.
+    """
+    if not raw:
+        return None
+    patients: dict[str, dict] = {}
+    demo_rids: list[int] = []
+    for key in sorted(raw.keys(), key=lambda k: int(str(k))):
+        blob = raw[key]
+        if not isinstance(blob, dict) or "observed_visits" not in blob:
+            continue
+        rid = int(blob.get("rid", key))
+        sk = str(rid)
+        ov = [float(x) for x in blob["observed_visits"]]
+        om = [float(x) for x in blob["observed_mmse"]]
+        pv = [float(x) for x in blob.get("pred_visits", [])]
+        pm = [float(x) for x in blob.get("pred_mmse", [])]
+        feats = blob.get("features", [])
+        ho = _hippo_for_visits(feats, ov)
+        hp = _hippo_for_visits(feats, pv)
+        try:
+            apoe_f = float(blob.get("apoe4", 0) or 0)
+        except (TypeError, ValueError):
+            apoe_f = 0.0
+        patients[sk] = {
+            "rid": rid,
+            "apoe4": apoe_f,
+            "dx_last": str(blob.get("dx_last", "—")),
+            "n_obs_visits": len(ov),
+            "visits_obs": ov,
+            "mmse_obs": om,
+            "hippo_obs": ho,
+            "pred_visits": pv,
+            "mmse_pred": pm,
+            "hippo_pred": hp,
+        }
+        demo_rids.append(rid)
+    if not patients:
+        return None
+    return {
+        "version": 1,
+        "prediction_method": "notebook_02_export",
+        "demo_rids": demo_rids,
+        "patients": patients,
+    }
+
+
 def load_demo_simulation() -> dict | None:
-    if not DEMO_SIM_PATH.exists():
+    if not DEMO_DATA_PATH.exists():
         return None
     try:
-        return json.loads(DEMO_SIM_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(DEMO_DATA_PATH.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+    return normalize_team_demo_data(raw)
 
 
 DEMO_SIM = load_demo_simulation()
@@ -359,7 +423,7 @@ def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
     fig = go.Figure()
     if not demo:
         fig.update_layout(**_plotly_layout_base("MMSE trajectory", "MMSE (0–30)", 360))
-        fig.add_annotation(text="Add results/metrics/demo_patients_simulation.json", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
+        fig.add_annotation(text="Add results/metrics/demo_data.json", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(color="#7a7a73", size=14))
         fig.update_xaxes(visible=False)
         fig.update_yaxes(visible=False)
         return fig
@@ -390,24 +454,11 @@ def demo_mmse_figure(rid: str, demo: dict | None) -> go.Figure:
             x=v_roll,
             y=m_roll,
             mode="lines+markers",
-            name="Predicted (twin rollout)",
+            name="Predicted (LSTM)",
             line=dict(color="#8fa396", width=2.2, dash="dash"),
             marker=dict(size=8, symbol="square", color="#8fa396"),
         )
     )
-    int_m = p.get("mmse_pred_intervention_40pct")
-    if int_m:
-        m_int = [m_obs[-1]] + list(int_m)
-        fig.add_trace(
-            go.Scatter(
-                x=v_roll,
-                y=m_int,
-                mode="lines+markers",
-                name="40% decline attenuation",
-                line=dict(color="#5a8f6f", width=2, dash="dot"),
-                marker=dict(size=7, symbol="diamond", color="#5a8f6f"),
-            )
-        )
     fig.add_hline(y=24, line_dash="dot", line_color="#c4c4bd", opacity=0.9)
     fig.add_annotation(
         xref="paper",
@@ -450,6 +501,7 @@ def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
             name="Observed (ADNI)",
             line=dict(color="#2f4f3f", width=2.8),
             marker=dict(size=9, color="#2f4f3f"),
+            connectgaps=False,
         )
     )
     fig.add_trace(
@@ -457,9 +509,10 @@ def demo_hippo_figure(rid: str, demo: dict | None) -> go.Figure:
             x=v_roll,
             y=h_roll,
             mode="lines+markers",
-            name="Predicted (twin rollout)",
+            name="Predicted (LSTM)",
             line=dict(color="#8fa396", width=2.2, dash="dash"),
             marker=dict(size=8, symbol="square", color="#8fa396"),
+            connectgaps=False,
         )
     )
     fig.update_layout(**_plotly_layout_base(f"Hippocampus — RID {p['rid']}", "Hippocampus volume (mm³)"))
@@ -474,8 +527,9 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
         return [html.P("Patient not found.", className="demo-meta__empty")]
     method = demo.get("prediction_method", "unknown")
     method_label = {
-        "lstm_rollout": "LSTM autoregressive rollout (matches notebook 05)",
-        "linear_extrapolation": "Linear extrapolation (checkpoint unavailable when JSON was built)",
+        "notebook_02_export": "LSTM predictions bundled with `02_lstm_model.ipynb` → demo_data.json",
+        "lstm_rollout": "LSTM autoregressive rollout",
+        "linear_extrapolation": "Linear extrapolation",
     }.get(method, method.replace("_", " "))
     items = [
         ("RID", str(p["rid"])),
@@ -513,9 +567,8 @@ def build_demo_simulation_section() -> html.Section:
                         html.P("Interactive", className="section__label"),
                         html.H2("Demo patient simulation.", className="section__title"),
                         html.P(
-                            "Choose one of five curated ADNI subjects. Observed points come from the cohort table; "
-                            "curves ahead of the last visit are twin rollouts exported with the same logic as "
-                            "`05_simulation.ipynb` (regenerate via scripts/export_demo_simulation_json.py).",
+                            "Five demo subjects from `results/metrics/demo_data.json`, produced when you run "
+                            "`02_lstm_model.ipynb` (observed prefix + LSTM one-step forecasts on held-out visit indices).",
                             className="section__lead",
                         ),
                         html.Div(
@@ -575,8 +628,7 @@ def build_demo_simulation_section() -> html.Section:
                     html.P("Interactive", className="section__label"),
                     html.H2("Demo patient simulation.", className="section__title"),
                     html.P(
-                        "Run scripts/export_demo_simulation_json.py (with data/raw/ADNIMERGE.csv and optionally "
-                        "models/checkpoints/lstm_best.pt) to write results/metrics/demo_patients_simulation.json, then reload this page.",
+                        "Run `02_lstm_model.ipynb` to write `results/metrics/demo_data.json`, then reload this page.",
                         className="section__lead",
                     ),
                 ],
@@ -921,15 +973,8 @@ def build_layout() -> html.Div:
                                             html.Div(
                                                 className="notebook-row",
                                                 children=[
-                                                    html.Span("results/metrics/demo_patients_simulation.json", className="notebook-row__name"),
-                                                    html.Span("Observed + rollout series for the demo twin", className="notebook-row__desc"),
-                                                ],
-                                            ),
-                                            html.Div(
-                                                className="notebook-row",
-                                                children=[
-                                                    html.Span("scripts/export_demo_simulation_json.py", className="notebook-row__name"),
-                                                    html.Span("Regenerate demo JSON (LSTM or linear fallback)", className="notebook-row__desc"),
+                                                    html.Span("results/metrics/demo_data.json", className="notebook-row__name"),
+                                                    html.Span("Demo patients for LSTM + hub (written by 02_lstm_model)", className="notebook-row__desc"),
                                                 ],
                                             ),
                                             html.Div(
@@ -982,7 +1027,7 @@ if DEMO_SIM and DEMO_SIM.get("patients"):
         Input("demo-patient-select", "value"),
     )
     def _update_demo_patient(rid: str | None):
-        r = str(rid) if rid else str(DEMO_SIM["demo_rids"][0])
+        r = str(rid) if rid else str(int(DEMO_SIM["demo_rids"][0]))
         return (
             demo_mmse_figure(r, DEMO_SIM),
             demo_hippo_figure(r, DEMO_SIM),
