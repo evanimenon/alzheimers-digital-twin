@@ -846,63 +846,97 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
 
 
 # ── Brain atrophy 3D section ──────────────────────────────────────────────────
-BRAIN_HTML_PATH = (RESULTS_ROOT / "visualizations" / "brain_atrophy_3d.html").resolve()
+BRAIN_HTML_PATH  = (RESULTS_ROOT / "visualizations" / "brain_atrophy_3d.html").resolve()
+BRAIN_RIDS       = [750, 667, 1282, 50, 128]
+BRAIN_HTML_PATHS = {
+    rid: (RESULTS_ROOT / "visualizations" / f"brain_atrophy_3d_{rid}.html").resolve()
+    for rid in BRAIN_RIDS
+}
 
 def build_brain_section() -> html.Section:
-    brain_available = BRAIN_HTML_PATH.is_file()
-    iframe_or_placeholder = (
-        html.Iframe(
-            src="/hub-results/visualizations/brain_atrophy_3d.html",
-            style={
-                "width": "100%",
-                "height": "580px",
-                "border": "none",
-                "borderRadius": "8px",
-                "background": "#f5f5f8",
-            },
-        )
-        if brain_available
-        else html.P(
-            "Run 06_brain_visualization.ipynb to generate brain_atrophy_3d.html, "
-            "then reload this page.",
-            className="section__lead",
-        )
+    # Build per-patient dropdown options
+    patient_labels = {
+        750:  "RID 750  ·  APOE4=1  ·  Hippo 5,256→4,836 mm³  (▼8.0%)",
+        667:  "RID 667  ·  APOE4=1  ·  Hippo 8,116→8,038 mm³  (▼1.0%)",
+        1282: "RID 1282 ·  APOE4=0  ·  Hippo 4,601→4,143 mm³  (▼9.9%)",
+        50:   "RID 50   ·  APOE4=0  ·  Hippo 4,831→4,556 mm³  (▼5.7%)",
+        128:  "RID 128  ·  APOE4=2  ·  Hippo 5,703→4,985 mm³  (▼12.6%)",
+    }
+
+    any_available = any(p.is_file() for p in BRAIN_HTML_PATHS.values())
+
+    # Dropdown to pick patient
+    patient_dropdown = html.Div(
+        style={"marginBottom": "1.25rem"},
+        children=[
+            html.Label(
+                "SELECT PATIENT",
+                style={"fontSize": "0.7rem", "letterSpacing": "0.08em",
+                       "color": "#9a9a92", "fontWeight": "500",
+                       "display": "block", "marginBottom": "0.4rem"},
+            ),
+            dcc.Dropdown(
+                id="brain-patient-select",
+                options=[
+                    {"label": label, "value": rid}
+                    for rid, label in patient_labels.items()
+                    if BRAIN_HTML_PATHS[rid].is_file()
+                ] if any_available else [{"label": "No HTML files found — run notebook", "value": 0}],
+                value=750 if BRAIN_HTML_PATHS.get(750, None) and BRAIN_HTML_PATHS[750].is_file() else (
+                    next((r for r in BRAIN_RIDS if BRAIN_HTML_PATHS[r].is_file()), 0)
+                ),
+                clearable=False,
+                style={"fontFamily": "DM Sans, Inter, sans-serif",
+                       "fontSize": "0.875rem",
+                       "maxWidth": "620px"},
+            ),
+        ],
     )
+
+    iframe_container = html.Div(
+        id="brain-iframe-container",
+        className="brain-iframe-wrap",
+        children=[
+            html.P(
+                "Run 06_brain_visualization.ipynb to generate per-patient HTML files, "
+                "then reload this page.",
+                className="section__lead",
+            )
+        ] if not any_available else [
+            html.Iframe(
+                id="brain-iframe",
+                src=f"/hub-results/visualizations/brain_atrophy_3d_750.html",
+                style={
+                    "width": "100%",
+                    "height": "600px",
+                    "border": "none",
+                    "borderRadius": "8px",
+                    "background": "#0d0f1a",
+                },
+            )
+        ]
+    )
+
     return html.Section(id="brain-3d", className="section", children=[
         html.Div(className="section__inner", children=[
             html.P("3D Digital Twin", className="section__label"),
-            html.H2("Brain atrophy — baseline vs 24 months.", className="section__title"),
+            html.H2(
+                "Brain atrophy — all 5 demo patients.",
+                className="section__title",
+            ),
             html.P(
-                "A personalised 3D model of patient RID 750's brain, coloured by atrophy "
-                "severity at each location. Left: first clinic visit. Right: two years later. "
-                "Driven by real ADNI hippocampus volumes and MMSE scores — rotate to explore.",
+                "Personalised 3D brain models coloured by atrophy severity at each location. "
+                "Select a patient from the dropdown to explore their unique trajectory. "
+                "Use the Baseline / Latest visit / Overlay buttons inside the viewer to compare. "
+                "Driven by real ADNI hippocampus volumes and MMSE scores.",
                 className="section__lead",
             ),
-            html.Div(
-                className="brain-stats-row",
-                children=[
-                    html.Div(className="brain-stat", children=[
-                        html.Span("5,256 mm³", className="brain-stat__val"),
-                        html.Span("Hippocampus at baseline", className="brain-stat__label"),
-                    ]),
-                    html.Div(className="brain-stat brain-stat--arrow", children=[
-                        html.Span("↓ 8%", className="brain-stat__val brain-stat__val--warn"),
-                        html.Span("volume loss over 24 months", className="brain-stat__label"),
-                    ]),
-                    html.Div(className="brain-stat", children=[
-                        html.Span("4,836 mm³", className="brain-stat__val"),
-                        html.Span("Hippocampus at 24 months", className="brain-stat__label"),
-                    ]),
-                    html.Div(className="brain-stat", children=[
-                        html.Span("27 → 8", className="brain-stat__val brain-stat__val--warn"),
-                        html.Span("MMSE score (out of 30)", className="brain-stat__label"),
-                    ]),
-                ],
-            ),
-            html.Div(className="brain-iframe-wrap", children=[iframe_or_placeholder]),
+            patient_dropdown,
+            # Stats row — updated dynamically by callback
+            html.Div(id="brain-stats-row", className="brain-stats-row"),
+            iframe_container,
             html.P(
-                "💡 Tip: click and drag to rotate · scroll to zoom · "
-                "double-click to reset view",
+                "💡 Tip: click and drag to rotate · scroll to zoom · double-click to reset view",
                 style={"fontSize": "0.8125rem", "color": "#9a9a92", "marginTop": "0.5rem",
                        "textAlign": "center"},
             ),
@@ -1667,6 +1701,47 @@ if DEMO_SIM and DEMO_SIM.get("patients"):
             demo_hippo_figure(r, DEMO_SIM),
             demo_meta_children(r, DEMO_SIM),
         )
+
+    # ── Brain 3D patient selector ─────────────────────────────────────────────
+    BRAIN_STATS = {
+        750:  {"hippo_bl": 5256, "hippo_end": 4836, "mmse_bl": 27, "mmse_end": 8,  "pct": 8.0},
+        667:  {"hippo_bl": 8116, "hippo_end": 8038, "mmse_bl": 28, "mmse_end": 20, "pct": 1.0},
+        1282: {"hippo_bl": 4601, "hippo_end": 4143, "mmse_bl": 26, "mmse_end": 23, "pct": 9.9},
+        50:   {"hippo_bl": 4831, "hippo_end": 4556, "mmse_bl": 25, "mmse_end": 23, "pct": 5.7},
+        128:  {"hippo_bl": 5703, "hippo_end": 4985, "mmse_bl": 29, "mmse_end": 26, "pct": 12.6},
+    }
+
+    @app.callback(
+        Output("brain-iframe",     "src",      allow_duplicate=True),
+        Output("brain-stats-row",  "children", allow_duplicate=True),
+        Input("brain-patient-select", "value"),
+        prevent_initial_call="initial_duplicate",
+    )
+    def _update_brain_patient(rid):
+        rid = int(rid) if rid else 750
+        src_url = f"/hub-results/visualizations/brain_atrophy_3d_{rid}.html"
+
+        s = BRAIN_STATS.get(rid, BRAIN_STATS[750])
+        warn_cls = "brain-stat__val brain-stat__val--warn"
+        stats = html.Div(className="brain-stats-row", children=[
+            html.Div(className="brain-stat", children=[
+                html.Span(f"{s['hippo_bl']:,} mm³", className="brain-stat__val"),
+                html.Span("Hippocampus at baseline", className="brain-stat__label"),
+            ]),
+            html.Div(className="brain-stat brain-stat--arrow", children=[
+                html.Span(f"↓ {s['pct']:.1f}%", className=warn_cls),
+                html.Span("hippocampus volume loss", className="brain-stat__label"),
+            ]),
+            html.Div(className="brain-stat", children=[
+                html.Span(f"{s['hippo_end']:,} mm³", className="brain-stat__val"),
+                html.Span("Hippocampus latest visit", className="brain-stat__label"),
+            ]),
+            html.Div(className="brain-stat", children=[
+                html.Span(f"{s['mmse_bl']} → {s['mmse_end']}", className=warn_cls),
+                html.Span("MMSE score (out of 30)", className="brain-stat__label"),
+            ]),
+        ])
+        return src_url, stats.children
 
 
 # ── Static file serving ───────────────────────────────────────────────────────
