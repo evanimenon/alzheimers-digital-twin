@@ -82,8 +82,7 @@ _IMAGE_INFO: dict[str, dict[str, str]] = {
     "results_dashboard": {
         "title": "The Big Picture: Results Dashboard",
         "html": (
-            "<p>Think of this as the project's master report card — six panels that tell the "
-            "complete story at once.</p>"
+            "<p>Think of this as the project's master report card</p>"
             "<p><strong>Panel A (top-left)</strong> counts patients: 1,591 cognitively normal (CN), "
             "1,564 with Mild Cognitive Impairment (MCI), and 595 with dementia. MCI is the "
             "crucial middle stage where early action is most possible.</p>"
@@ -333,6 +332,24 @@ _IMAGE_INFO: dict[str, dict[str, str]] = {
             "epoch 40 — proving it learned genuine patterns that a simple heuristic cannot.</p>"
         ),
     },
+    "evaluation": {
+        "title": "Hippocampus Volume Predictions: Near-Perfect Accuracy",
+        "html": (
+            "<p>Each green dot represents one patient visit where the model predicted their "
+            "hippocampus volume (y-axis) and we compared it to the actual MRI measurement "
+            "(x-axis). The dashed diagonal line is perfect prediction.</p>"
+            "<p>The dots hug the diagonal almost perfectly — the LSTM achieves R² = 0.99 "
+            "and a Mean Absolute Error of just 69 mm³. With average hippocampus volumes "
+            "around 5,000 mm³, a 69 mm³ error is less than 1.4% — exceptional accuracy "
+            "for a neural sequence model.</p>"
+            "<p>Why is this so much better than MMSE prediction? Brain volume measured by "
+            "MRI is a more stable biological measurement than a cognitive test score. MRI "
+            "volumes do not fluctuate day-to-day due to mood, sleep, or test anxiety — so "
+            "there is less 'noise' for the model to fight against.</p>"
+            "<p>This result validates that the digital twin can faithfully track biological "
+            "disease markers, not just cognitive symptoms.</p>"
+        ),
+    },
     "lstm_eval_plots": {
         "title": "LSTM Prediction Quality: Three Lenses",
         "html": (
@@ -352,24 +369,7 @@ _IMAGE_INFO: dict[str, dict[str, str]] = {
             "1.76 points instead of 3.5 on a 30-point scale is a meaningful improvement.</p>"
         ),
     },
-    "evaluation": {
-        "title": "Hippocampus Volume Predictions: Near-Perfect Accuracy",
-        "html": (
-            "<p>Each green dot represents one patient visit where the model predicted their "
-            "hippocampus volume (y-axis) and we compared it to the actual MRI measurement "
-            "(x-axis). The dashed diagonal line is perfect prediction.</p>"
-            "<p>The dots hug the diagonal almost perfectly — the LSTM achieves R² = 0.99 "
-            "and a Mean Absolute Error of just 69 mm³. With average hippocampus volumes "
-            "around 5,000 mm³, a 69 mm³ error is less than 1.4% — exceptional accuracy "
-            "for a neural sequence model.</p>"
-            "<p>Why is this so much better than MMSE prediction? Brain volume measured by "
-            "MRI is a more stable biological measurement than a cognitive test score. MRI "
-            "volumes do not fluctuate day-to-day due to mood, sleep, or test anxiety — so "
-            "there is less 'noise' for the model to fight against.</p>"
-            "<p>This result validates that the digital twin can faithfully track biological "
-            "disease markers, not just cognitive symptoms.</p>"
-        ),
-    },
+
 }
 
 # Serialise to a JS const that can be embedded in the page
