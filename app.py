@@ -21,6 +21,8 @@ SIMULATION_PATH = ROOT / "results" / "metrics" / "simulation_summary.json"
 DEMO_DATA_PATH = ROOT / "results" / "metrics" / "demo_data.json"
 RESULTS_ROOT = (ROOT / "results").resolve()
 
+GITHUB_URL = "https://github.com/evanimenon/alzheimers-digital-twin"
+
 # ── Team ──────────────────────────────────────────────────────────────────────
 TEAM_MEMBERS = [
     "Evani Menon",
@@ -617,9 +619,10 @@ def _plotly_layout_base(title: str, yaxis_title: str, height: int = 400) -> dict
                    pad=dict(t=4, b=4)),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafaf7",
         font=dict(family="DM Sans, sans-serif", size=12, color="#3c3c38"),
-        margin=dict(l=56, r=28, t=80, b=56), height=height,
-        legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="right",
-                    x=1, bgcolor="rgba(0,0,0,0)", font=dict(size=11)),
+        margin=dict(l=56, r=28, t=52, b=72), height=height,
+        legend=dict(orientation="h", yanchor="top", y=-0.14, xanchor="left",
+                    x=0, bgcolor="rgba(0,0,0,0)", font=dict(size=12),
+                    entrywidth=180, entrywidthmode="pixels"),
         xaxis=dict(title=dict(text="Visit number", font=dict(size=11, color="#7a7a73")),
                    gridcolor="#e6e6e0", zeroline=False, linecolor="#e6e6e0"),
         yaxis=dict(title=dict(text=yaxis_title, font=dict(size=11, color="#7a7a73")),
@@ -1093,7 +1096,7 @@ def build_layout() -> html.Div:
                     html.H1("Alzheimer's digital twin", className="hero__title"),
                     html.P(
                         "Longitudinal ADNI signals, sequence models, classification, "
-                        "visual analytics, and simulation — presented with room to breathe.",
+                        "visual analytics, and simulation.",
                         className="hero__subtitle",
                     ),
                     html.Div(className="hero__rule"),
@@ -1102,6 +1105,12 @@ def build_layout() -> html.Div:
                         html.Span("By  ", className="hero__byline-label"),
                         team_str,
                     ]),
+                    html.A(
+                        "View on GitHub ↗",
+                        href=GITHUB_URL,
+                        target="_blank", rel="noopener noreferrer",
+                        className="hero__github-btn",
+                    ),
                 ])
             ]),
 
@@ -1217,7 +1226,7 @@ def build_layout() -> html.Div:
                             html.Span("What-if & Monte Carlo summaries",className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
                             html.Span("results/metrics/demo_data.json",                  className="notebook-row__name"),
-                            html.Span("Demo patients for LSTM + hub (written by 02_lstm_model)",className="notebook-row__desc")]),
+                            html.Span("Demo patients for LSTM + hub (written by lstm_model)",className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
                             html.Span("data/raw/ADNIMERGE.csv",  className="notebook-row__name"),
                             html.Span("Source table (local only)",className="notebook-row__desc")]),
@@ -1231,6 +1240,9 @@ def build_layout() -> html.Div:
             html.Div(className="site-footer__inner", children=[
                 html.P("Alzheimer's digital twin — exploratory research software. Not a medical device."),
                 html.P(f"Project by {', '.join(TEAM_MEMBERS)}.", className="site-footer__team"),
+                html.A("View on GitHub ↗", href=GITHUB_URL,
+                       target="_blank", rel="noopener noreferrer",
+                       className="site-footer__github"),
             ])
         ]),
 
@@ -1259,20 +1271,20 @@ _CUSTOM_CSS = """
 /* ── Brain 3D section ────────────────────────────────────────────── */
 .brain-stats-row {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
   flex-wrap: wrap;
-  margin: 1.25rem 0 1.5rem;
+  margin: 1rem 0 1.25rem;
   align-items: stretch;
 }
 .brain-stat {
   background: #f5f5f8;
   border-radius: 8px;
-  padding: 0.75rem 1.25rem;
+  padding: 0.65rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 155px;
-  flex: 1 1 155px;
+  gap: 3px;
+  min-width: 150px;
+  flex: 1 1 150px;
 }
 .brain-stat__val {
   font-size: 1.2rem;
@@ -1318,16 +1330,55 @@ _CUSTOM_CSS = """
   flex-shrink: 0;
 }
 
-/* ── Footer team line ────────────────────────────────────────────── */
-.site-footer__inner { display: flex; flex-direction: column; gap: 0.25rem; }
+/* ── Nav inner: flex row so links stay on one line ──────────────── */
+.site-nav__inner {
+  display: flex !important;
+  align-items: center !important;
+  position: relative;
+}
+.site-nav__links {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ── GitHub button in hero ───────────────────────────────────────── */
+.hero__github-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 0.5rem 1.1rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2f4f3f !important;
+  border: 1.5px solid rgba(47,79,63,0.35);
+  border-radius: 6px;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.hero__github-btn:hover {
+  background: rgba(47,79,63,0.06);
+  border-color: #2f4f3f;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+.site-footer__inner { display: flex; flex-direction: column; gap: 0.2rem; }
 .site-footer__team  { font-size: 0.75rem; color: #9a9a92; }
+.site-footer__github {
+  font-size: 0.75rem;
+  color: #8fa396;
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+.site-footer__github:hover { color: #2f4f3f; }
 
 /* ── Demo section alignment fixes ───────────────────────────────── */
 .demo-toolbar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   flex-wrap: wrap;
 }
 .demo-toolbar__label {
@@ -1345,21 +1396,21 @@ _CUSTOM_CSS = """
 .demo-charts {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  margin-top: 1rem;
+  gap: 1rem;
+  margin-top: 0.75rem;
   align-items: start;
 }
 .chart-wrap {
   background: #fff;
-  border-radius: 10px;
-  border: 1px solid #ebebе5;
+  border-radius: 8px;
+  border: 1px solid #eaeae4;
   overflow: hidden;
   min-width: 0;
 }
 .chart-wrap--demo {
   background: #fafaf7;
-  border: 1px solid #e8e8e2;
-  border-radius: 10px;
+  border: 1px solid #eaeae4;
+  border-radius: 8px;
   overflow: hidden;
   min-width: 0;
   padding-top: 0;
@@ -1370,11 +1421,11 @@ _CUSTOM_CSS = """
   width: 100% !important;
 }
 .demo-meta {
-  margin: 0.75rem 0 0;
-  padding: 0.875rem 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0.75rem 1rem;
   background: #f8f8f5;
   border-radius: 8px;
-  border: 1px solid #ebebе5;
+  border: 1px solid #eaeae4;
 }
 .demo-meta__dl {
   display: grid;
@@ -1586,6 +1637,21 @@ _CUSTOM_CSS = """
   .lb-img-pane { flex: none; max-height: 38vh; padding: 1rem; }
   .lb-info-pane { flex: 1; min-height: 0; padding: 1.5rem 1.25rem; }
   .lb-title { font-size: 1.05rem; margin-right: 2rem; }
+}
+
+/* ── Spacing normalisation ───────────────────────────────────────── */
+/* Tighten metrics block stacking */
+.metrics-block + .metrics-block { margin-top: 2rem; }
+/* Reduce bottom gap on section leads */
+.section__lead { margin-bottom: 1.25rem !important; }
+/* Consistent gallery grid gap */
+.gallery-grid { gap: 1rem !important; }
+/* Pipeline steps tighter */
+.pipeline { gap: 1rem !important; }
+/* Notebook list tighter row gaps */
+.notebook-row {
+  padding-top: 0.6rem !important;
+  padding-bottom: 0.6rem !important;
 }
 """
 
