@@ -1,6 +1,5 @@
 """
 Alzheimer's Digital Twin — project hub (Dash).
-Updated: team names · interactive gallery lightbox · layman-friendly explanations.
 
 Run from repo root:  python app.py
 Then open http://127.0.0.1:8050
@@ -827,7 +826,7 @@ def demo_meta_children(rid: str, demo: dict | None) -> list:
         return [html.P("Patient not found.", className="demo-meta__empty")]
     method = demo.get("prediction_method", "unknown")
     method_label = {
-        "notebook_02_export": "LSTM predictions bundled with 02_lstm_model.ipynb → demo_data.json",
+        "notebook_02_export": "LSTM predictions bundled with lstm_model.ipynb → demo_data.json",
         "lstm_rollout": "LSTM autoregressive rollout",
         "linear_extrapolation": "Linear extrapolation",
     }.get(method, method.replace("_", " "))
@@ -898,7 +897,7 @@ def build_brain_section() -> html.Section:
         className="brain-iframe-wrap",
         children=[
             html.P(
-                "Run 06_brain_visualization.ipynb to generate per-patient HTML files, "
+                "Run brain_visualization.ipynb to generate per-patient HTML files, "
                 "then reload this page.",
                 className="section__lead",
             )
@@ -958,7 +957,7 @@ def build_demo_simulation_section() -> html.Section:
                 html.P("Interactive", className="section__label"),
                 html.H2("Demo patient simulation.", className="section__title"),
                 html.P("Five demo subjects from results/metrics/demo_data.json, produced when "
-                       "you run 02_lstm_model.ipynb (observed prefix + LSTM one-step forecasts "
+                       "you run lstm_model.ipynb (observed prefix + LSTM one-step forecasts "
                        "on held-out visit indices).", className="section__lead"),
                 html.Div(className="demo-toolbar", children=[
                     html.Label("Patient", className="demo-toolbar__label",
@@ -984,7 +983,7 @@ def build_demo_simulation_section() -> html.Section:
         html.Div(className="section__inner", children=[
             html.P("Interactive", className="section__label"),
             html.H2("Demo patient simulation.", className="section__title"),
-            html.P("Run 02_lstm_model.ipynb to write results/metrics/demo_data.json, "
+            html.P("Run lstm_model.ipynb to write results/metrics/demo_data.json, "
                    "then reload this page.", className="section__lead"),
         ])])
 
@@ -1205,16 +1204,16 @@ def build_layout() -> html.Div:
                             html.Span("data_exploration.ipynb",    className="notebook-row__name"),
                             html.Span("Cohort profile & features", className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
-                            html.Span("02_lstm_model.ipynb",               className="notebook-row__name"),
+                            html.Span("lstm_model.ipynb",               className="notebook-row__name"),
                             html.Span("LSTM training & regression metrics",className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
-                            html.Span("03_classification.ipynb",         className="notebook-row__name"),
+                            html.Span("classification.ipynb",         className="notebook-row__name"),
                             html.Span("XGBoost diagnosis & conversion",  className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
-                            html.Span("04_visualization.ipynb",             className="notebook-row__name"),
+                            html.Span("visualization.ipynb",             className="notebook-row__name"),
                             html.Span("Dashboards, trajectories, SHAP / ROC",className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
-                            html.Span("05_simulation.ipynb",           className="notebook-row__name"),
+                            html.Span("simulation.ipynb",           className="notebook-row__name"),
                             html.Span("What-if & Monte Carlo summaries",className="notebook-row__desc")]),
                         html.Div(className="notebook-row", children=[
                             html.Span("results/metrics/demo_data.json",                  className="notebook-row__name"),
